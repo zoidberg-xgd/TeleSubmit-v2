@@ -73,6 +73,10 @@ from handlers.submit_handlers import (
 # 错误处理
 from handlers.error_handler import error_handler
 
+# 统计和搜索功能
+from handlers.stats_handlers import get_hot_posts, get_user_stats, update_post_stats
+from handlers.search_handlers import search_posts, get_tag_cloud, get_my_posts, search_by_user
+
 # 设置日志
 logger = logging.getLogger(__name__)
 setup_logging()
@@ -256,6 +260,14 @@ def setup_application(application):
     application.add_handler(CommandHandler("settings", settings))
     application.add_handler(CommandHandler("blacklist", manage_blacklist), group=1)
     
+    # 注册统计和搜索命令处理器
+    application.add_handler(CommandHandler("hot", get_hot_posts))
+    application.add_handler(CommandHandler("mystats", get_user_stats))
+    application.add_handler(CommandHandler("search", search_posts))
+    application.add_handler(CommandHandler("tags", get_tag_cloud))
+    application.add_handler(CommandHandler("myposts", get_my_posts))
+    application.add_handler(CommandHandler("searchuser", search_by_user))
+    
     # 注册会话超时检查处理器
     application.add_handler(MessageHandler(filters.ALL, check_conversation_timeout), group=0)
     
@@ -351,7 +363,10 @@ def setup_application(application):
             
         # 每天凌晨3点执行一次日志清理
         job_queue.run_daily(clean_logs_job, time=datetime_time(hour=3, minute=0))
-        logger.info("定期任务设置完成")
+        
+        # 添加帖子统计数据更新任务（每小时执行一次）
+        job_queue.run_repeating(update_post_stats, interval=3600, first=60)
+        logger.info("定期任务设置完成（包括统计数据更新）")
     except Exception as e:
         logger.error(f"设置定期任务失败: {e}", exc_info=True)
     
