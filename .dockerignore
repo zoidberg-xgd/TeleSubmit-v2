@@ -1,0 +1,66 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+
+# 虚拟环境
+venv/
+env/
+ENV/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 日志文件
+logs/
+*.log
+
+# 数据库文件（部署时会使用volume挂载）
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+data/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# 文档
+README.md
+CHANGELOG.md
+*.md
+docs/
+
+# 配置文件（部署时通过volume挂载）
+config.ini
+
+# 测试文件
+tests/
+test_*.py
+*_test.py
+
+# 其他
+.DS_Store
+*.bak
+*.tmp
+.env
+

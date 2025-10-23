@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  telesubmit:
+    build: .
+    container_name: telesubmit-bot
+    restart: unless-stopped
+    
+    # 挂载配置文件和数据目录
+    volumes:
+      - ./config.ini:/app/config.ini:ro  # 只读挂载配置文件
+      - ./data:/app/data                  # 持久化数据库文件
+      - ./logs:/app/logs                  # 持久化日志文件
+    
+    # 环境变量（可选，会覆盖config.ini中的配置）
+    environment:
+      - TZ=Asia/Shanghai
+      # - BOT_TOKEN=your_bot_token_here
+      # - CHANNEL_ID=@your_channel_name
+    
+    # 资源限制（可选）
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    
+    # 日志配置
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # 网络模式
+    network_mode: bridge
+    
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os; exit(0 if os.path.exists('config.ini') else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+

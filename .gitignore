@@ -1,0 +1,70 @@
+# 系统和编辑器文件
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Python相关
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+venv/
+.venv/
+ENV/
+
+# 配置文件和敏感数据
+*.ini
+config.ini
+*_副本.ini
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 数据库文件
+*.db
+*.sqlite
+*.sqlite3
+submissions.db
+telesubmit.db
+
+# 日志文件
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 临时文件
+.tmp/
+temp/
+tmp/
+
+# Docker 相关数据目录
+data/
+backups/
+*.tar.gz
+
+# 其他
+.coverage
+htmlcov/
+.pytest_cache/

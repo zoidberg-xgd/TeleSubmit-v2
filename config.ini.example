@@ -1,0 +1,41 @@
+[BOT]
+# Telegram机器人令牌，从BotFather获取
+# 格式类似：1234567890:ABCDEFGHIJKLMNOPQRSTUVWXYZ
+TOKEN = your_bot_token_here
+
+# 目标频道ID，格式为@channel_username或-100开头的ID
+# 例如：@your_channel 或 -1001234567890
+CHANNEL_ID = @your_channel_name
+
+# 数据库文件路径，相对于程序所在目录
+# 默认为submissions.db
+DB_PATH = submissions.db
+
+# 会话超时时间（秒）
+# 用户在此时间内未操作则会话自动结束
+TIMEOUT = 300
+
+# 最多允许的标签数量
+# 用户提交的标签超过此数量会被截断
+ALLOWED_TAGS = 30
+
+# 机器人工作模式，可选值:
+# MEDIA - 仅支持媒体投稿（图片、视频、GIF等）
+# DOCUMENT - 仅支持文档投稿（PDF、DOC等）
+# MIXED - 混合模式，用户可以选择投稿类型
+BOT_MODE = MIXED
+
+# 机器人所有者的Telegram用户ID
+# 必须是数字ID，不能是用户名
+# 使用@userinfobot或@RawDataBot获取您的用户ID
+OWNER_ID = your_user_id_here
+
+# 是否在投稿内容尾部显示投稿人信息
+# True - 显示投稿人链接
+# False - 不显示投稿人信息
+SHOW_SUBMITTER = True
+
+# 是否向所有者发送投稿通知
+# True - 有新投稿时向所有者发送通知，包含用户ID和投稿链接
+# False - 不发送通知
+NOTIFY_OWNER = True 
