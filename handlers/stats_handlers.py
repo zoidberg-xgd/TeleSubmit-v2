@@ -10,6 +10,7 @@ from telegram.ext import CallbackContext
 
 from config.settings import CHANNEL_ID, OWNER_ID
 from database.db_manager import get_db
+from utils.heat_calculator import calculate_multi_message_heat, get_quality_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +119,7 @@ async def update_post_stats(context: CallbackContext):
     定期更新频道帖子统计数据
     
     这个函数会被定时任务调用，用于更新所有活跃帖子的统计信息
+    支持多组媒体：累加所有相关消息的统计数据
     
     Args:
         context: 回调上下文
@@ -131,7 +133,7 @@ async def update_post_stats(context: CallbackContext):
             # 获取最近30天的帖子（避免过度请求API）
             cutoff_time = (datetime.now() - timedelta(days=30)).timestamp()
             await cursor.execute(
-                "SELECT message_id, publish_time FROM published_posts WHERE publish_time > ?",
+                "SELECT message_id, publish_time, related_message_ids FROM published_posts WHERE publish_time > ?",
                 (cutoff_time,)
             )
             posts = await cursor.fetchall()
@@ -142,17 +144,47 @@ async def update_post_stats(context: CallbackContext):
             for post in posts:
                 message_id = post['message_id']
                 publish_time = post['publish_time']
+                related_ids_json = post['related_message_ids']
                 
-                # 获取帖子统计信息
-                stats = await get_post_statistics(context, message_id)
+                # 获取主消息的统计信息
+                main_stats = await get_post_statistics(context, message_id)
                 
-                if stats:
-                    # 计算热度分数
-                    heat_score = calculate_heat_score(
-                        views=stats['views'],
-                        forwards=stats['forwards'],
-                        reactions=stats['reactions'],
+                if main_stats:
+                    related_stats_list = []
+                    
+                    # 如果有关联消息（多组媒体），获取它们的统计
+                    if related_ids_json:
+                        try:
+                            related_ids = json.loads(related_ids_json)
+                            logger.info(f"帖子 {message_id} 有 {len(related_ids)} 个关联消息，使用智能算法计算热度")
+                            
+                            for related_id in related_ids:
+                                related_stats = await get_post_statistics(context, related_id)
+                                if related_stats:
+                                    related_stats_list.append(related_stats)
+                                await asyncio.sleep(1)  # 避免API限制
+                                
+                        except json.JSONDecodeError:
+                            logger.warning(f"解析关联消息ID失败: {related_ids_json}")
+                    
+                    # 使用智能算法计算热度（避免重复计数）
+                    heat_result = calculate_multi_message_heat(
+                        main_stats=main_stats,
+                        related_stats_list=related_stats_list,
                         publish_time=publish_time
+                    )
+                    
+                    # 获取质量指标
+                    quality_metrics = get_quality_metrics(main_stats, related_stats_list)
+                    
+                    logger.info(
+                        f"帖子 {message_id} 热度计算完成 | "
+                        f"有效浏览: {heat_result['effective_views']:.0f} | "
+                        f"有效转发: {heat_result['effective_forwards']} | "
+                        f"有效反应: {heat_result['effective_reactions']:.0f} | "
+                        f"热度: {heat_result['heat_score']:.2f} | "
+                        f"互动率: {quality_metrics['engagement_rate']:.2%} | "
+                        f"完成率: {quality_metrics['completion_rate']:.2%}"
                     )
                     
                     # 更新数据库
@@ -162,8 +194,12 @@ async def update_post_stats(context: CallbackContext):
                             heat_score = ?, last_update = ?
                         WHERE message_id = ?
                     """, (
-                        stats['views'], stats['forwards'], stats['reactions'],
-                        heat_score, datetime.now().timestamp(), message_id
+                        int(heat_result['effective_views']),
+                        int(heat_result['effective_forwards']),
+                        int(heat_result['effective_reactions']),
+                        heat_result['heat_score'], 
+                        datetime.now().timestamp(), 
+                        message_id
                     ))
                     updated_count += 1
                 else:
@@ -181,7 +217,7 @@ async def update_post_stats(context: CallbackContext):
 
 async def get_hot_posts(update: Update, context: CallbackContext):
     """
-    获取热门帖子排行
+    获取热门帖子排行 - 只显示主贴，优化预览样式
     
     命令格式：
     /hot [数量] [时间范围]
@@ -216,7 +252,8 @@ async def get_hot_posts(update: Update, context: CallbackContext):
                 # 第一个参数是时间范围
                 time_filter = args[0].lower()
         
-        # 构建查询
+        # 构建查询 - 只查询主贴（有标题或至少有内容的帖子）
+        # published_posts 表中存储的都是主贴，不包含多组媒体的后续消息
         query = "SELECT * FROM published_posts WHERE 1=1"
         query_params = []
         
@@ -252,8 +289,8 @@ async def get_hot_posts(update: Update, context: CallbackContext):
             await update.message.reply_text(f"📊 暂无{time_desc}热门帖子数据")
             return
         
-        # 构建消息
-        message = f"🔥 {time_desc}热门帖子 TOP {len(hot_posts)}\n\n"
+        # 构建消息 - 优化显示格式
+        message = f"🔥 <b>{time_desc}热门帖子 TOP {len(hot_posts)}</b>\n\n"
         
         for idx, post in enumerate(hot_posts, 1):
             # 生成帖子链接
@@ -264,42 +301,129 @@ async def get_hot_posts(update: Update, context: CallbackContext):
                 post_link = f"消息ID: {post['message_id']}"
             
             # 解析标签
-            try:
-                tags = json.loads(post['tags']) if post['tags'] else []
-                tags_preview = ' '.join([f"#{tag}" for tag in tags[:3]])
-            except:
-                tags_preview = ""
+            tags_display = ""
+            if post['tags']:
+                try:
+                    # 尝试解析JSON格式的标签
+                    tags = json.loads(post['tags'])
+                    if isinstance(tags, list):
+                        tags_display = ' '.join([f"#{tag}" for tag in tags[:5]])  # 显示最多5个标签
+                    else:
+                        tags_display = post['tags']  # 如果不是列表，直接显示
+                except:
+                    # 如果解析失败，假设是空格分隔的字符串
+                    tags_list = post['tags'].split()[:5]
+                    tags_display = ' '.join([f"#{tag.lstrip('#')}" for tag in tags_list])
             
+            # 处理标题
             title = post['title'] or '无标题'
-            # 标题过长则截断
-            if len(title) > 30:
-                title = title[:27] + '...'
+            if len(title) > 40:
+                title = title[:37] + '...'
             
-            message += (
-                f"{idx}. {title}\n"
-                f"   {tags_preview}\n"
-                f"   📊 浏览: {post['views']} | 转发: {post['forwards']}"
-            )
+            # 处理简介（note）
+            note_preview = ""
+            if post['note']:
+                note = post['note'].strip()
+                if note:
+                    # 去掉换行，限制长度
+                    note = note.replace('\n', ' ').replace('\r', ' ')
+                    if len(note) > 60:
+                        note = note[:57] + '...'
+                    note_preview = f"\n   💬 {note}"
             
+            # 格式化发布时间
+            publish_time = datetime.fromtimestamp(post['publish_time'])
+            time_ago = _format_time_ago(publish_time)
+            
+            # 构建单个帖子的显示
+            message += f"<b>{idx}.</b> <a href='{post_link}'>{title}</a>\n"
+            
+            if tags_display:
+                message += f"   🏷 {tags_display}\n"
+            
+            if note_preview:
+                message += note_preview + "\n"
+            
+            # 统计数据
+            stats_parts = []
+            if post['views'] > 0:
+                stats_parts.append(f"👁 {_format_number(post['views'])}")
+            if post['forwards'] > 0:
+                stats_parts.append(f"📤 {post['forwards']}")
             if post['reactions'] > 0:
-                message += f" | 反应: {post['reactions']}"
+                stats_parts.append(f"❤️ {post['reactions']}")
             
-            message += f"\n   🔥 热度: {post['heat_score']:.1f}\n"
-            message += f"   🔗 {post_link}\n\n"
+            if stats_parts:
+                message += f"   📊 {' | '.join(stats_parts)}\n"
+            
+            # 热度和时间
+            message += f"   🔥 热度: <code>{post['heat_score']:.1f}</code> • 🕐 {time_ago}\n"
+            message += "\n"
             
             # 防止消息过长
             if len(message) > 3500:
-                message += "...\n\n更多帖子请使用 /search 搜索"
+                message += "...\n\n💡 更多帖子请使用 /search 搜索"
                 break
         
-        message += f"\n💡 提示：使用 /hot <数量> <时间> 自定义查询\n"
-        message += f"时间范围：day(今日)、week(本周)、month(本月)"
+        message += f"━━━━━━━━━━━━━━━\n"
+        message += f"💡 使用 <code>/hot &lt;数量&gt; &lt;时间&gt;</code> 自定义查询\n"
+        message += f"⏰ 时间范围：day(今日)、week(本周)、month(本月)"
         
-        await update.message.reply_text(message, disable_web_page_preview=True)
+        await update.message.reply_text(
+            message, 
+            disable_web_page_preview=True,
+            parse_mode='HTML'
+        )
         
     except Exception as e:
         logger.error(f"获取热门帖子失败: {e}")
         await update.message.reply_text("❌ 获取热门帖子失败，请稍后重试")
+
+
+def _format_time_ago(publish_time: datetime) -> str:
+    """
+    格式化时间为"多久前"的形式
+    
+    Args:
+        publish_time: 发布时间
+        
+    Returns:
+        str: 格式化的时间字符串
+    """
+    now = datetime.now()
+    delta = now - publish_time
+    
+    if delta.days > 30:
+        months = delta.days // 30
+        return f"{months}月前"
+    elif delta.days > 0:
+        return f"{delta.days}天前"
+    elif delta.seconds >= 3600:
+        hours = delta.seconds // 3600
+        return f"{hours}小时前"
+    elif delta.seconds >= 60:
+        minutes = delta.seconds // 60
+        return f"{minutes}分钟前"
+    else:
+        return "刚刚"
+
+
+def _format_number(num: int) -> str:
+    """
+    格式化数字，大数字使用k、w等单位
+    
+    Args:
+        num: 要格式化的数字
+        
+    Returns:
+        str: 格式化后的字符串
+    """
+    if num >= 10000:
+        return f"{num / 10000:.1f}w"
+    elif num >= 1000:
+        return f"{num / 1000:.1f}k"
+    else:
+        return str(num)
 
 
 async def get_user_stats(update: Update, context: CallbackContext):

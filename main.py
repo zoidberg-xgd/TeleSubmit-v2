@@ -10,7 +10,7 @@ import platform
 import logging
 import os
 from datetime import datetime, time as datetime_time
-from telegram import Update
+from telegram import Update, BotCommand
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -76,6 +76,9 @@ from handlers.error_handler import error_handler
 # 统计和搜索功能
 from handlers.stats_handlers import get_hot_posts, get_user_stats, update_post_stats
 from handlers.search_handlers import search_posts, get_tag_cloud, get_my_posts, search_by_user
+
+# 搜索引擎
+from utils.search_engine import init_search_engine
 
 # 设置日志
 logger = logging.getLogger(__name__)
@@ -171,6 +174,30 @@ async def log_all_updates(update: Update, context: CallbackContext) -> None:
         logger.info(f"收到命令: {update.message.text} 来自用户: {update.effective_user.id}")
     return None  # 允许更新继续传递给其他处理器
 
+async def setup_bot_commands(application):
+    """
+    设置机器人命令菜单（左侧斜杠按钮）
+    """
+    commands = [
+        BotCommand("start", "🚀 启动机器人"),
+        BotCommand("submit", "📝 发起投稿"),
+        BotCommand("search", "🔍 搜索投稿内容"),
+        BotCommand("tags", "🏷️ 查看标签云"),
+        BotCommand("myposts", "📋 查看我的投稿"),
+        BotCommand("mystats", "📊 查看个人统计"),
+        BotCommand("hot", "🔥 查看热门投稿"),
+        BotCommand("help", "❓ 查看帮助信息"),
+        BotCommand("cancel", "❌ 取消当前操作"),
+        BotCommand("settings", "⚙️ 机器人设置"),
+    ]
+    
+    try:
+        await application.bot.set_my_commands(commands)
+        logger.info(f"成功设置 {len(commands)} 个命令菜单项")
+    except Exception as e:
+        logger.error(f"设置命令菜单失败: {e}", exc_info=True)
+
+
 async def main():
     """
     主函数 - 设置并启动机器人
@@ -184,6 +211,19 @@ async def main():
     initialize_database()
     # 初始化黑名单
     await init_blacklist()
+    
+    # 初始化搜索引擎
+    logger.info("正在初始化搜索引擎...")
+    try:
+        from config.settings import SEARCH_INDEX_DIR, SEARCH_ENABLED
+        if SEARCH_ENABLED:
+            init_search_engine(index_dir=SEARCH_INDEX_DIR, from_scratch=False)
+            logger.info(f"搜索引擎初始化完成，索引目录: {SEARCH_INDEX_DIR}")
+        else:
+            logger.info("搜索功能已禁用")
+    except Exception as e:
+        logger.error(f"搜索引擎初始化失败: {e}", exc_info=True)
+        logger.warning("将继续运行，但搜索功能可能不可用")
     
     # 创建和启动应用程序
     token = TOKEN
@@ -201,6 +241,10 @@ async def main():
     logger.info("机器人正在启动，使用Ctrl+C停止")
     await application.initialize()
     await application.start()
+    
+    # 设置命令菜单
+    await setup_bot_commands(application)
+    
     await application.updater.start_polling(allowed_updates=None)
     
     # 添加事件处理器以便优雅关闭
@@ -342,8 +386,9 @@ def setup_application(application):
     except Exception as e:
         logger.error(f"注册会话处理器失败: {e}", exc_info=True)
     
-    # 添加回调查询处理器
-    application.add_handler(CallbackQueryHandler(settings_callback), group=3)
+    # 添加回调查询处理器（统一处理所有回调）
+    from handlers.callback_handlers import handle_callback_query
+    application.add_handler(CallbackQueryHandler(handle_callback_query), group=3)
     
     # 添加周期性清理任务
     try:
