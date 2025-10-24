@@ -68,8 +68,8 @@ check_root() {
 # 检查 Docker
 check_docker() {
     if command -v docker &> /dev/null && command -v docker-compose &> /dev/null; then
-        DOCKER_VERSION=$(docker --version | grep -oP '\d+\.\d+\.\d+' | head -1)
-        COMPOSE_VERSION=$(docker-compose --version | grep -oP '\d+\.\d+\.\d+' | head -1)
+        DOCKER_VERSION=$(docker --version | sed -E 's/.*version ([0-9]+\.[0-9]+\.[0-9]+).*/\1/' | head -1)
+        COMPOSE_VERSION=$(docker-compose --version | sed -E 's/.*version ([0-9]+\.[0-9]+\.[0-9]+).*/\1/' | head -1)
         print_success "Docker 已安装: $DOCKER_VERSION"
         print_success "Docker Compose 已安装: $COMPOSE_VERSION"
         HAS_DOCKER=true
@@ -82,7 +82,7 @@ check_docker() {
 # 检查 Python
 check_python() {
     if command -v python3 &> /dev/null; then
-        PYTHON_VERSION=$(python3 --version | grep -oP '\d+\.\d+\.\d+')
+        PYTHON_VERSION=$(python3 --version | sed -E 's/Python ([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
         print_success "Python 已安装: $PYTHON_VERSION"
         
         # 检查版本是否满足要求
