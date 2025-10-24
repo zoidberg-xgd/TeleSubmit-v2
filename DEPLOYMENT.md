@@ -265,8 +265,6 @@ python3 utils/index_manager.py rebuild
 python3 utils/index_manager.py status
 ```
 
-更多索引管理信息请查看 [索引管理器文档](INDEX_MANAGER_README.md)。
-
 ## 更新和升级
 
 ### 常规更新
@@ -373,8 +371,6 @@ python3 utils/index_manager.py rebuild
    [Statistics]
    STATS_CACHE_TTL = 600         # 增加缓存时间
    ```
-
-详细内存分析请查看 [内存占用说明](MEMORY_USAGE.md)。
 
 ### 频道消息发送失败
 
@@ -537,8 +533,6 @@ crontab -e
 
 - [脚本使用指南](SCRIPTS_GUIDE.md) - 所有管理脚本详细说明
 - [管理员指南](ADMIN_GUIDE.md) - 管理功能和系统维护
-- [索引管理器](INDEX_MANAGER_README.md) - 搜索索引管理
-- [内存占用说明](MEMORY_USAGE.md) - 内存使用分析
 - [更新日志](CHANGELOG.md) - 版本历史
 
 ## 获取帮助
