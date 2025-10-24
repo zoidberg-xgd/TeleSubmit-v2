@@ -76,6 +76,15 @@ backups/
 # 用户会话数据库（应该在data/目录）
 user_sessions.db
 
+# 个人管理脚本（不推送到 GitHub）
+check_tags.py
+clear_all_posts.py
+clear_test_posts.py
+delete_posts_by_id.py
+test_commands.py
+test_tag_cloud.py
+test_*.py
+
 # 内部文档（不推送到 GitHub）
 GITHUB_UPLOAD_GUIDE.md
 PUSH_TO_GITHUB.md
@@ -86,3 +95,4 @@ INTEGRATION_SUMMARY.md
 SEARCH_INTEGRATION.md
 UPGRADE_GUIDE.md
 COMPARISON.md
+GITHUB_FILES.md
