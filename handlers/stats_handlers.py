@@ -97,8 +97,8 @@ async def get_post_statistics(context: CallbackContext, message_id: int):
             # 删除转发的消息以保持私聊整洁
             try:
                 await context.bot.delete_message(chat_id=OWNER_ID, message_id=forwarded.message_id)
-            except:
-                pass
+            except Exception as e:
+                logger.debug(f"无法删除转发消息: {e}")
             
             return {
                 'views': views,
@@ -310,7 +310,7 @@ async def get_hot_posts(update: Update, context: CallbackContext):
                         tags_display = ' '.join([f"#{tag}" for tag in tags[:5]])  # 显示最多5个标签
                     else:
                         tags_display = post['tags']  # 如果不是列表，直接显示
-                except:
+                except (json.JSONDecodeError, TypeError, ValueError):
                     # 如果解析失败，假设是空格分隔的字符串
                     tags_list = post['tags'].split()[:5]
                     tags_display = ' '.join([f"#{tag.lstrip('#')}" for tag in tags_list])

@@ -157,7 +157,7 @@ async def search_posts(update: Update, context: CallbackContext):
             try:
                 tags = json.loads(hit.tags) if hit.tags else []
                 tags_preview = ' '.join([f"#{tag}" for tag in tags[:3]])
-            except:
+            except (json.JSONDecodeError, TypeError, AttributeError):
                 tags_preview = hit.tags[:50] if hit.tags else ""
             
             # 使用高亮标题（如果有）
@@ -317,7 +317,7 @@ async def get_tag_cloud(update: Update, context: CallbackContext):
                 tags = json.loads(post['tags'])
                 for tag in tags:
                     tag_counts[tag] = tag_counts.get(tag, 0) + 1
-            except:
+            except (json.JSONDecodeError, TypeError, ValueError):
                 # 如果不是 JSON，按空格分割（当前格式：'#测试 #标签2'）
                 tags_text = post['tags']
                 if tags_text:
@@ -417,7 +417,7 @@ async def get_my_posts(update: Update, context: CallbackContext):
             try:
                 tags = json.loads(post['tags']) if post['tags'] else []
                 tags_preview = ' '.join([f"#{tag}" for tag in tags[:3]])
-            except:
+            except (json.JSONDecodeError, TypeError, KeyError):
                 tags_preview = ""
             
             title = post['title'] or '无标题'
