@@ -85,6 +85,10 @@ delete_posts_by_id.py
 test_commands.py
 test_tag_cloud.py
 test_*.py
+fix_*.py
+fetch_*.py
+migrate_*.py
+check_*.py
 
 # 内部文档（不推送到 GitHub）
 GITHUB_UPLOAD_GUIDE.md
@@ -99,3 +103,30 @@ COMPARISON.md
 GITHUB_FILES.md
 PRIVACY_PROTECTION_SUMMARY.md
 隐私保护完成.md
+
+# 临时文档和测试文档
+*_SUMMARY.md
+*_GUIDE.md
+*_FIX.md
+*_QUICKSTART.md
+*_README.md
+SEARCH_*.md
+FILE_TYPE_*.md
+FEATURE_*.md
+BUGFIX_*.md
+OPTIMIZATION_*.md
+STATUS_*.md
+IMPLEMENTATION_*.md
+DEPLOYMENT_*.md
+测试*.md
+临时*.md
+*_测试.md
+*_临时.md
+*_说明.md
+.gitignore_说明.md
+
+# 其他临时文件
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/

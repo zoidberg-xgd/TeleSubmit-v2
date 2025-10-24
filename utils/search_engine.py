@@ -74,13 +74,14 @@ class SearchHit:
     """搜索结果项"""
     
     def __init__(self, message_id: int, title: str, description: str, 
-                 tags: str, link: str, user_id: int, username: str,
+                 tags: str, filename: str, link: str, user_id: int, username: str,
                  publish_time: datetime, views: int, heat_score: float,
                  highlighted_title: str = "", highlighted_desc: str = ""):
         self.message_id = message_id
         self.title = title
         self.description = description
         self.tags = tags
+        self.filename = filename
         self.link = link
         self.user_id = user_id
         self.username = username
@@ -256,6 +257,7 @@ class PostSearchEngine:
                         title=hit.get('title', ''),
                         description=hit.get('description', ''),
                         tags=hit.get('tags', ''),
+                        filename=hit.get('filename', ''),
                         link=hit.get('link', ''),
                         user_id=hit.get('user_id', 0),
                         username=hit.get('username', ''),
