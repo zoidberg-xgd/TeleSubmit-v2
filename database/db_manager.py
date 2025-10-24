@@ -65,6 +65,7 @@ async def init_db():
                     content_type TEXT,
                     file_ids TEXT,
                     caption TEXT,
+                    filename TEXT,
                     publish_time REAL,
                     views INTEGER DEFAULT 0,
                     forwards INTEGER DEFAULT 0,

@@ -56,6 +56,20 @@ async def save_published_post(user_id, message_id, data, media_list, doc_list, a
         username = data['username'] if 'username' in data.keys() and data['username'] else f'user{user_id}'
         publish_time = datetime.now()
         
+        # 提取文件名（从文档列表中）
+        filename = ''
+        if doc_list:
+            filenames = []
+            for doc_item in doc_list:
+                # 新格式：document:file_id:filename
+                parts = doc_item.split(':', 2)
+                if len(parts) >= 3:
+                    filenames.append(parts[2])
+                elif len(parts) == 2:
+                    # 兼容旧格式 document:file_id
+                    filenames.append('未知文件')
+            filename = ' | '.join(filenames) if filenames else ''
+        
         # 处理相关消息ID（用于多组媒体热度统计）
         related_ids_json = None
         if all_message_ids and len(all_message_ids) > 1:
@@ -71,8 +85,8 @@ async def save_published_post(user_id, message_id, data, media_list, doc_list, a
             await cursor.execute("""
                 INSERT INTO published_posts 
                 (message_id, user_id, username, title, tags, link, note,
-                 content_type, file_ids, caption, publish_time, last_update, related_message_ids)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 content_type, file_ids, caption, filename, publish_time, last_update, related_message_ids)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 message_id,
                 user_id,
@@ -84,12 +98,13 @@ async def save_published_post(user_id, message_id, data, media_list, doc_list, a
                 content_type,
                 file_ids,
                 caption,
+                filename,
                 publish_time.timestamp(),
                 publish_time.timestamp(),
                 related_ids_json
             ))
             await conn.commit()
-            logger.info(f"已保存帖子 {message_id} 到published_posts表")
+            logger.info(f"已保存帖子 {message_id} 到published_posts表（文件名: {filename}）")
         
         # 添加到搜索索引
         try:
@@ -102,6 +117,7 @@ async def save_published_post(user_id, message_id, data, media_list, doc_list, a
                 title=title,
                 description=note,  # 使用note作为描述
                 tags=tags,
+                filename=filename,  # 文件名
                 link=link,
                 user_id=user_id,
                 username=username,
@@ -112,7 +128,7 @@ async def save_published_post(user_id, message_id, data, media_list, doc_list, a
             
             # 添加到索引
             search_engine.add_post(post_doc)
-            logger.info(f"已添加帖子 {message_id} 到搜索索引")
+            logger.info(f"已添加帖子 {message_id} 到搜索索引（文件名: {filename}）")
             
         except Exception as e:
             logger.error(f"添加到搜索索引失败: {e}", exc_info=True)
@@ -571,7 +587,8 @@ async def handle_document_publish(context, doc_list, caption=None, reply_to_mess
     """
     if len(doc_list) == 1 and caption is not None:
         # 单个文档处理
-        _, file_id = doc_list[0].split(":", 1)
+        parts = doc_list[0].split(":", 2)
+        file_id = parts[1] if len(parts) >= 2 else parts[0]
         try:
             return await safe_send(
                 context.bot.send_document,
@@ -589,7 +606,9 @@ async def handle_document_publish(context, doc_list, caption=None, reply_to_mess
         try:
             doc_media_group = []
             for i, doc_item in enumerate(doc_list):
-                _, file_id = doc_item.split(":", 1)
+                # 新格式：document:file_id:filename 或 旧格式：document:file_id
+                parts = doc_item.split(":", 2)
+                file_id = parts[1] if len(parts) >= 2 else parts[0]
                 # 只在最后一个文档添加说明，且caption不为None
                 caption_to_use = caption if (i == len(doc_list) - 1 and caption is not None) else None
                 doc_media_group.append(InputMediaDocument(

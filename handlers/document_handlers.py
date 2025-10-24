@@ -58,7 +58,9 @@ async def handle_doc(update: Update, context: CallbackContext) -> int:
         return STATE['DOC']
     
     logger.info(f"文件类型验证通过: user_id={user_id}, file={doc.file_name}, mime={doc.mime_type}")
-    new_doc = f"document:{doc.file_id}"
+    # 存储格式：document:file_id:filename
+    filename = doc.file_name or "未命名文件"
+    new_doc = f"document:{doc.file_id}:{filename}"
     
     try:
         async with get_db() as conn:

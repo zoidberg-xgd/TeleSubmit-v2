@@ -28,6 +28,7 @@ class PostDocument:
         title=TEXT(stored=True, analyzer=ChineseAnalyzer()),
         description=TEXT(stored=True, analyzer=ChineseAnalyzer()),
         tags=TEXT(stored=True, analyzer=ChineseAnalyzer()),
+        filename=TEXT(stored=True, analyzer=ChineseAnalyzer()),
         link=TEXT(stored=True),
         user_id=ID(stored=True),  # 使用 ID 类型支持大整数
         username=TEXT(stored=True),
@@ -37,13 +38,14 @@ class PostDocument:
     )
     
     def __init__(self, message_id: int, title: str = "", description: str = "", 
-                 tags: str = "", link: str = "", user_id: int = 0, 
+                 tags: str = "", filename: str = "", link: str = "", user_id: int = 0, 
                  username: str = "", publish_time: datetime = None, 
                  views: int = 0, heat_score: float = 0):
         self.message_id = str(message_id)
         self.title = title or ""
         self.description = description or ""
         self.tags = tags or ""
+        self.filename = filename or ""
         self.link = link or ""
         self.user_id = user_id
         self.username = username or ""
@@ -58,6 +60,7 @@ class PostDocument:
             'title': self.title,
             'description': self.description,
             'tags': self.tags,
+            'filename': self.filename,
             'link': self.link,
             'user_id': str(self.user_id),  # 转换为字符串以支持大整数
             'username': self.username,
@@ -133,7 +136,7 @@ class PostSearchEngine:
         
         # 创建查询解析器（支持多字段搜索）
         self.query_parser = MultifieldParser(
-            ['title', 'description', 'tags'],
+            ['title', 'description', 'tags', 'filename'],
             schema=PostDocument.schema
         )
         

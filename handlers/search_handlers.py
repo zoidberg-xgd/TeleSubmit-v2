@@ -50,12 +50,15 @@ async def search_posts(update: Update, context: CallbackContext):
                 "• /search Python\n"
                 "• /search #编程\n"
                 "• /search 教程 -t week\n"
-                "• /search API -n 20\n\n"
+                "• /search API -n 20\n"
+                "• /search 文件名.txt\n\n"
+                "搜索范围：\n"
+                "• 标题、简介、标签、文件名\n\n"
                 "选项：\n"
                 "• -t day/week/month - 时间范围\n"
                 "• -n <数量> - 结果数量（最多30）\n\n"
                 "💡 使用 /tags 查看所有标签\n"
-                "✨ 新功能：支持中文分词，搜索更智能！"
+                "✨ 支持中文分词和文件名搜索！"
             )
             return
         
