@@ -79,6 +79,7 @@ user_sessions.db
 # 个人管理脚本（不推送到 GitHub）
 check_tags.py
 check_sensitive_info.sh
+push_to_github.sh
 clear_all_posts.py
 clear_test_posts.py
 delete_posts_by_id.py
