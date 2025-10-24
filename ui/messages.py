@@ -167,7 +167,7 @@ class MessageFormatter:
             try:
                 dt = datetime.fromisoformat(created_at)
                 time_str = dt.strftime("%m-%d %H:%M")
-            except:
+            except (ValueError, TypeError):
                 time_str = created_at
         else:
             time_str = "未知"
@@ -209,7 +209,7 @@ class MessageFormatter:
             try:
                 dt = datetime.fromisoformat(created_at)
                 time_str = dt.strftime("%Y-%m-%d %H:%M")
-            except:
+            except (ValueError, TypeError):
                 time_str = created_at
         else:
             time_str = "未知"

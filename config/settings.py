@@ -26,21 +26,21 @@ def get_config(section, key, fallback=None):
     """安全获取配置值"""
     try:
         return config.get(section, key)
-    except:
+    except (configparser.NoSectionError, configparser.NoOptionError, ValueError):
         return fallback
 
 def get_config_int(section, key, fallback=0):
     """安全获取整数配置值"""
     try:
         return config.getint(section, key)
-    except:
+    except (configparser.NoSectionError, configparser.NoOptionError, ValueError):
         return fallback
 
 def get_config_bool(section, key, fallback=False):
     """安全获取布尔配置值"""
     try:
         return config.getboolean(section, key)
-    except:
+    except (configparser.NoSectionError, configparser.NoOptionError, ValueError):
         return fallback
 
 # 从环境变量或配置文件获取配置（环境变量优先）
