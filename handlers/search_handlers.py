@@ -173,9 +173,15 @@ async def search_posts(update: Update, context: CallbackContext):
             # 发布时间
             publish_date = hit.publish_time.strftime('%Y-%m-%d')
             
+            # 匹配字段提示
+            matched_info = ""
+            if hasattr(hit, 'matched_fields') and hit.matched_fields:
+                matched_info = f"   💡 匹配: {', '.join(hit.matched_fields)}\n"
+            
             message += (
                 f"{idx}. {title}\n"
                 f"   {tags_preview}\n"
+                f"{matched_info}"
                 f"   📅 {publish_date} | 👀 {hit.views} | 🔥 {hit.heat_score:.0f}\n"
                 f"   🔗 {post_link}\n\n"
             )
