@@ -25,6 +25,7 @@ class PostDocument:
     # 定义 Whoosh 索引结构
     schema = Schema(
         message_id=ID(stored=True, unique=True),
+        post_id=NUMERIC(stored=True),  # 数据库ID，用于删除操作
         title=TEXT(stored=True, analyzer=ChineseAnalyzer()),
         description=TEXT(stored=True, analyzer=ChineseAnalyzer()),
         tags=TEXT(stored=True, analyzer=ChineseAnalyzer()),
@@ -40,8 +41,9 @@ class PostDocument:
     def __init__(self, message_id: int, title: str = "", description: str = "", 
                  tags: str = "", filename: str = "", link: str = "", user_id: int = 0, 
                  username: str = "", publish_time: datetime = None, 
-                 views: int = 0, heat_score: float = 0):
+                 views: int = 0, heat_score: float = 0, post_id: int = None):
         self.message_id = str(message_id)
+        self.post_id = post_id  # 数据库ID
         self.title = title or ""
         self.description = description or ""
         self.tags = tags or ""
@@ -57,6 +59,7 @@ class PostDocument:
         """转换为字典用于索引"""
         return {
             'message_id': self.message_id,
+            'post_id': self.post_id if self.post_id is not None else 0,
             'title': self.title,
             'description': self.description,
             'tags': self.tags,
@@ -77,8 +80,9 @@ class SearchHit:
                  tags: str, filename: str, link: str, user_id: int, username: str,
                  publish_time: datetime, views: int, heat_score: float,
                  highlighted_title: str = "", highlighted_desc: str = "",
-                 matched_fields: List[str] = None):
+                 matched_fields: List[str] = None, post_id: int = None):
         self.message_id = message_id
+        self.post_id = post_id  # 数据库ID，用于删除操作
         self.title = title
         self.description = description
         self.tags = tags
@@ -270,6 +274,7 @@ class PostSearchEngine:
                     
                     search_hit = SearchHit(
                         message_id=int(hit.get('message_id', 0)),
+                        post_id=int(hit.get('post_id', 0)) if hit.get('post_id') else None,
                         title=hit.get('title', ''),
                         description=hit.get('description', ''),
                         tags=hit.get('tags', ''),

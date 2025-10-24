@@ -75,7 +75,13 @@ from handlers.error_handler import error_handler
 
 # 统计和搜索功能
 from handlers.stats_handlers import get_hot_posts, get_user_stats, update_post_stats
-from handlers.search_handlers import search_posts, get_tag_cloud, get_my_posts, search_by_user
+from handlers.search_handlers import (
+    search_posts, 
+    get_tag_cloud, 
+    get_my_posts, 
+    search_by_user, 
+    delete_posts_batch
+)
 
 # 搜索引擎
 from utils.search_engine import init_search_engine
@@ -311,6 +317,7 @@ def setup_application(application):
     application.add_handler(CommandHandler("tags", get_tag_cloud))
     application.add_handler(CommandHandler("myposts", get_my_posts))
     application.add_handler(CommandHandler("searchuser", search_by_user))
+    application.add_handler(CommandHandler("delete_posts", delete_posts_batch))
     
     # 注册会话超时检查处理器
     application.add_handler(MessageHandler(filters.ALL, check_conversation_timeout), group=0)

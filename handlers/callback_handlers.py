@@ -335,20 +335,34 @@ async def handle_stats_post(update: Update, context: CallbackContext):
 
 
 async def handle_delete_post(update: Update, context: CallbackContext):
-    """删除帖子"""
+    """
+    删除帖子（仅 OWNER 可用）
+    
+    Args:
+        update: Telegram 更新对象
+        context: 回调上下文
+    """
     query = update.callback_query
-    post_id = query.data.replace("delete_post_", "")
+    message_id = query.data.replace("delete_post_", "")
     user_id = update.effective_user.id
     
-    # 检查权限
+    # 检查权限：只有 OWNER 可以删除
     if not is_owner(user_id):
-        await query.answer("⛔ 权限不足", show_alert=True)
+        await query.answer("⛔ 权限不足：只有管理员可以删除帖子", show_alert=True)
+        logger.warning(f"用户 {user_id} 尝试删除帖子但权限不足")
         return
     
     # 显示确认对话框
     await query.edit_message_text(
-        "⚠️ 确定要删除这条帖子吗？此操作不可恢复！",
-        reply_markup=Keyboards.yes_no("delete_post", post_id)
+        "⚠️ <b>删除确认</b>\n\n"
+        f"确定要删除消息 ID 为 <code>{message_id}</code> 的帖子记录吗？\n\n"
+        "⚠️ 此操作将：\n"
+        "• ✅ 从数据库删除记录\n"
+        "• ✅ 从搜索索引删除\n"
+        "• ❌ <b>不会</b>删除频道消息（需手动删除）\n\n"
+        "此操作<b>不可恢复</b>！",
+        reply_markup=Keyboards.yes_no("delete_post", message_id),
+        parse_mode=ParseMode.HTML
     )
 
 
@@ -467,20 +481,27 @@ async def handle_pagination(update: Update, context: CallbackContext):
 
 
 async def handle_confirm_action(update: Update, context: CallbackContext):
-    """处理确认操作"""
+    """
+    处理确认操作（仅 OWNER 可用）
+    
+    Args:
+        update: Telegram 更新对象
+        context: 回调上下文
+    """
     query = update.callback_query
     action_data = query.data.replace("confirm_", "")
     user_id = update.effective_user.id
     
-    # 检查权限
+    # 检查权限：只有 OWNER 可以确认危险操作
     if not is_owner(user_id):
-        await query.answer("⛔ 权限不足", show_alert=True)
+        await query.answer("⛔ 权限不足：只有管理员可以执行此操作", show_alert=True)
+        logger.warning(f"用户 {user_id} 尝试确认操作但权限不足")
         return
     
     # 解析操作类型
     if action_data.startswith("delete_post_"):
-        post_id = action_data.replace("delete_post_", "")
-        await execute_delete_post(query, post_id, context)
+        message_id = action_data.replace("delete_post_", "")
+        await execute_delete_post(query, message_id, context)
     else:
         # 其他确认操作
         await query.edit_message_text("✅ 操作已确认")
@@ -497,39 +518,43 @@ async def handle_cancel_action(update: Update, context: CallbackContext):
         await query.edit_message_text("❌ 操作已取消")
 
 
-async def execute_delete_post(query, post_id: str, context: CallbackContext):
+async def execute_delete_post(query, message_id: str, context: CallbackContext):
     """
-    执行删除帖子操作
+    执行删除帖子操作（仅 OWNER 可用）
     
     Args:
         query: CallbackQuery对象
-        post_id: 帖子ID（数据库ID，不是message_id）
+        message_id: 频道消息ID
         context: 回调上下文
     """
     try:
         async with get_db() as conn:
             cursor = await conn.cursor()
             
-            # 获取帖子信息
+            # 根据 message_id 获取帖子信息
             await cursor.execute(
-                "SELECT message_id, related_message_ids FROM published_posts WHERE id=?",
-                (post_id,)
+                "SELECT id, message_id, related_message_ids FROM published_posts WHERE message_id=?",
+                (int(message_id),)
             )
             post_row = await cursor.fetchone()
             
             if not post_row:
-                await query.edit_message_text("❌ 帖子不存在")
+                await query.edit_message_text("❌ 帖子不存在或已被删除")
+                logger.warning(f"尝试删除不存在的帖子: message_id={message_id}")
                 return
             
-            message_id = post_row['message_id']
+            post_id = post_row['id']
             related_ids_json = post_row['related_message_ids']
             
             # 从搜索索引中删除
+            index_deleted = False
+            related_count = 0
             try:
                 from utils.search_engine import get_search_engine
                 search_engine = get_search_engine()
                 if search_engine:
-                    search_engine.delete_post(message_id)
+                    search_engine.delete_post(int(message_id))
+                    index_deleted = True
                     logger.info(f"已从搜索索引删除帖子: {message_id}")
                     
                     # 如果有关联消息，也从索引删除
@@ -539,38 +564,13 @@ async def execute_delete_post(query, post_id: str, context: CallbackContext):
                             related_ids = json.loads(related_ids_json)
                             for related_id in related_ids:
                                 search_engine.delete_post(related_id)
-                            logger.info(f"已从索引删除 {len(related_ids)} 个关联消息")
+                                related_count += 1
+                            logger.info(f"已从索引删除 {related_count} 个关联消息")
                         except json.JSONDecodeError:
                             logger.warning(f"解析关联消息ID失败: {related_ids_json}")
             except Exception as e:
                 logger.error(f"从搜索索引删除失败: {e}")
                 # 继续执行，不因索引删除失败而中断
-            
-            # 尝试从频道删除消息
-            deletion_summary = []
-            try:
-                from config.settings import CHANNEL_ID
-                await context.bot.delete_message(chat_id=CHANNEL_ID, message_id=message_id)
-                deletion_summary.append(f"✅ 已删除主消息 {message_id}")
-                logger.info(f"已从频道删除消息: {message_id}")
-            except Exception as e:
-                deletion_summary.append(f"⚠️ 删除主消息失败: {str(e)[:50]}")
-                logger.warning(f"删除频道消息失败: {e}")
-            
-            # 删除关联消息
-            if related_ids_json:
-                import json
-                try:
-                    related_ids = json.loads(related_ids_json)
-                    for related_id in related_ids:
-                        try:
-                            await context.bot.delete_message(chat_id=CHANNEL_ID, message_id=related_id)
-                            deletion_summary.append(f"✅ 已删除关联消息 {related_id}")
-                        except Exception as e:
-                            deletion_summary.append(f"⚠️ 删除关联消息 {related_id} 失败")
-                            logger.warning(f"删除关联消息 {related_id} 失败: {e}")
-                except json.JSONDecodeError:
-                    logger.warning(f"解析关联消息ID失败: {related_ids_json}")
             
             # 从数据库删除记录
             await cursor.execute("DELETE FROM published_posts WHERE id=?", (post_id,))
@@ -578,13 +578,20 @@ async def execute_delete_post(query, post_id: str, context: CallbackContext):
             logger.info(f"已从数据库删除帖子记录: ID={post_id}, message_id={message_id}")
             
             # 构建响应消息
-            response = "🗑️ <b>删除操作完成</b>\n\n"
-            response += "\n".join(deletion_summary[:10])  # 限制显示前10条
-            if len(deletion_summary) > 10:
-                response += f"\n... 还有 {len(deletion_summary) - 10} 条消息"
-            response += "\n\n📝 已从数据库和搜索索引中移除"
+            from config.settings import CHANNEL_ID
+            channel_link = f"https://t.me/{CHANNEL_ID.lstrip('@')}/{message_id}" if CHANNEL_ID.startswith('@') else f"消息ID: {message_id}"
             
-            await query.edit_message_text(response, parse_mode=ParseMode.HTML)
+            response = "✅ <b>删除操作完成</b>\n\n"
+            response += f"📝 消息ID: <code>{message_id}</code>\n"
+            response += f"🔗 频道链接: {channel_link}\n\n"
+            response += "<b>已完成：</b>\n"
+            response += "✅ 从数据库删除记录\n"
+            response += f"✅ 从搜索索引删除" + (f"（包含 {related_count} 个关联消息）" if related_count > 0 else "") + "\n\n" if index_deleted else "⚠️ 搜索索引删除失败\n\n"
+            response += "<b>⚠️ 注意：</b>\n"
+            response += "频道中的消息<b>未被删除</b>，如需删除请手动操作。\n"
+            response += f"可以直接访问上方链接或在频道中查找消息 ID <code>{message_id}</code> 进行删除。"
+            
+            await query.edit_message_text(response, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
             
     except Exception as e:
         logger.error(f"删除帖子时出错: {e}", exc_info=True)
