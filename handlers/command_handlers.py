@@ -6,7 +6,7 @@ import logging
 import asyncio
 from datetime import datetime
 from typing import Dict, List, Any
-from telegram import Update
+from telegram import Update, ReplyKeyboardRemove
 from telegram.ext import ConversationHandler, CallbackContext
 
 from database.db_manager import get_db
@@ -42,7 +42,8 @@ async def cancel(update: Update, context: CallbackContext) -> int:
             await c.execute("DELETE FROM submissions WHERE user_id=?", (user_id,))
     except Exception as e:
         logger.error(f"取消时删除数据错误: {e}")
-    await update.message.reply_text("❌ 投稿已取消")
+    # 清除键盘，避免残留旧按钮
+    await update.message.reply_text("❌ 投稿已取消", reply_markup=ReplyKeyboardRemove())
     return ConversationHandler.END
 
 async def help_command(update: Update, context: CallbackContext):

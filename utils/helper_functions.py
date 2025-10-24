@@ -7,7 +7,7 @@ import asyncio
 import logging
 from functools import lru_cache, wraps
 from datetime import datetime
-from telegram import Update
+from telegram import Update, ReplyKeyboardRemove
 from telegram.ext import ConversationHandler, CallbackContext
 
 from config.settings import ALLOWED_TAGS, NET_TIMEOUT, SHOW_SUBMITTER
@@ -234,6 +234,92 @@ def validate_state(expected_state: int):
             return await func(update, context)
         return wrapper
     return decorator
+
+async def end_conversation_with_message(update: Update, message: str, clear_keyboard: bool = True) -> int:
+    """
+    统一的会话终止函数，发送消息并清理键盘
+    
+    Args:
+        update: Telegram 更新对象
+        message: 要发送的消息
+        clear_keyboard: 是否清除键盘（默认True）
+        
+    Returns:
+        int: ConversationHandler.END
+    """
+    try:
+        if clear_keyboard:
+            await update.message.reply_text(message, reply_markup=ReplyKeyboardRemove())
+        else:
+            await update.message.reply_text(message)
+    except Exception as e:
+        logger.error(f"发送终止消息失败: {e}")
+    
+    return ConversationHandler.END
+
+
+async def handle_conversation_error(update: Update, error_message: str = "❌ 内部错误，请稍后再试") -> int:
+    """
+    统一的会话错误处理函数
+    
+    Args:
+        update: Telegram 更新对象
+        error_message: 错误消息
+        
+    Returns:
+        int: ConversationHandler.END
+    """
+    logger.error(f"会话错误: {error_message}")
+    return await end_conversation_with_message(update, error_message, clear_keyboard=True)
+
+
+def get_submission_mode(row) -> str:
+    """
+    从数据库行中提取投稿模式
+    
+    Args:
+        row: 数据库查询结果行（sqlite3.Row 对象）
+        
+    Returns:
+        str: 投稿模式 ('media', 'document', 'mixed')
+    """
+    if not row:
+        return "mixed"
+    
+    # 处理 sqlite3.Row 对象
+    if hasattr(row, 'keys'):
+        mode = row["mode"] if "mode" in row.keys() else "mixed"
+    else:
+        mode = row.get("mode", "mixed")
+    
+    return mode.lower() if mode else "mixed"
+
+
+def parse_json_list(raw_data: str) -> list:
+    """
+    安全解析JSON列表数据
+    
+    Args:
+        raw_data: JSON字符串
+        
+    Returns:
+        list: 解析后的列表，失败返回空列表
+    """
+    if not raw_data:
+        return []
+    
+    try:
+        parsed = json.loads(raw_data)
+        # 只接受列表类型，其他类型返回空列表
+        if isinstance(parsed, list):
+            return parsed
+        else:
+            logger.debug(f"JSON解析结果不是列表: {type(parsed)}")
+            return []
+    except (json.JSONDecodeError, TypeError) as e:
+        logger.debug(f"JSON解析失败: {e}")
+        return []
+
 
 async def safe_send(send_func, *args, **kwargs):
     """

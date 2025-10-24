@@ -3,13 +3,14 @@
 """
 import json
 import logging
+import asyncio
 from datetime import datetime
 from telegram import Update
 from telegram.ext import ConversationHandler, CallbackContext
 
 from models.state import STATE
 from database.db_manager import get_db
-from utils.helper_functions import validate_state
+from utils.helper_functions import validate_state, safe_send, end_conversation_with_message, handle_conversation_error
 from utils.file_validator import create_file_validator
 from config.settings import ALLOWED_FILE_TYPES
 
@@ -39,7 +40,8 @@ async def handle_doc(update: Update, context: CallbackContext) -> int:
         # 获取允许的文件类型描述
         allowed_types_desc = file_validator.get_allowed_types_description()
         
-        await update.message.reply_text(
+        await safe_send(
+            update.message.reply_text,
             f"⚠️ 请发送文档文件\n\n"
             f"📎 请以文件附件形式发送：\n"
             f"• 点击聊天输入框旁的📎图标\n"
@@ -54,7 +56,7 @@ async def handle_doc(update: Update, context: CallbackContext) -> int:
     is_valid, error_msg = file_validator.validate(doc.file_name, doc.mime_type)
     if not is_valid:
         logger.warning(f"文件类型验证失败: user_id={user_id}, file={doc.file_name}, mime={doc.mime_type}")
-        await update.message.reply_text(error_msg)
+        await safe_send(update.message.reply_text, error_msg)
         return STATE['DOC']
     
     logger.info(f"文件类型验证通过: user_id={user_id}, file={doc.file_name}, mime={doc.mime_type}")
@@ -69,8 +71,7 @@ async def handle_doc(update: Update, context: CallbackContext) -> int:
             row = await c.fetchone()
             
             if not row:
-                await update.message.reply_text("❌ 会话已过期，请重新发送 /start")
-                return ConversationHandler.END
+                return await end_conversation_with_message(update, "❌ 会话已过期，请重新发送 /start")
                 
             # 增强型错误处理
             doc_list = []
@@ -82,7 +83,7 @@ async def handle_doc(update: Update, context: CallbackContext) -> int:
             
             # 限制文档数量为10个
             if len(doc_list) >= 10:
-                await update.message.reply_text("⚠️ 已达到文档上传上限（10个）")
+                await safe_send(update.message.reply_text, "⚠️ 已达到文档上传上限（10个）")
                 return STATE['DOC']
                 
             doc_list.append(new_doc)
@@ -90,12 +91,28 @@ async def handle_doc(update: Update, context: CallbackContext) -> int:
                       (json.dumps(doc_list), datetime.now().timestamp(), user_id))
         
         logger.info(f"当前文档数量：{len(doc_list)}")
-        await update.message.reply_text(
+        
+        # 使用安全发送，避免网络超时导致异常
+        result = await safe_send(
+            update.message.reply_text,
             f"✅ 已接收文档，共计 {len(doc_list)} 个。\n继续发送文档文件，或发送 /done_doc 完成上传。"
         )
+        
+        if result is None:
+            logger.warning(f"发送确认消息失败，但文档已保存，user_id: {user_id}")
+            
     except Exception as e:
-        logger.error(f"文档保存错误: {e}")
-        await update.message.reply_text("❌ 文档保存失败，请稍后再试")
+        logger.error(f"文档保存错误: {type(e).__name__}: {e}", exc_info=True)
+        
+        # 尝试发送错误消息，即使失败也不影响主流程
+        try:
+            await safe_send(
+                update.message.reply_text,
+                "❌ 文档保存失败，请稍后再试"
+            )
+        except:
+            pass
+            
         return ConversationHandler.END
         
     return STATE['DOC']
@@ -122,8 +139,7 @@ async def done_doc(update: Update, context: CallbackContext) -> int:
             row = await c.fetchone()
             
             if not row:
-                await update.message.reply_text("❌ 会话已过期，请重新发送 /start")
-                return ConversationHandler.END
+                return await end_conversation_with_message(update, "❌ 会话已过期，请重新发送 /start")
                 
             # 增强型错误处理
             doc_list = []
@@ -135,7 +151,8 @@ async def done_doc(update: Update, context: CallbackContext) -> int:
             
             # 文档必选 - 检查至少有一个文档
             if not doc_list:
-                await update.message.reply_text(
+                await safe_send(
+                    update.message.reply_text,
                     "⚠️ 请至少发送一个文档文件\n\n"
                     "📎 请以文件附件形式发送：\n"
                     "• 点击聊天输入框旁的📎图标\n"
@@ -149,7 +166,8 @@ async def done_doc(update: Update, context: CallbackContext) -> int:
             mode = mode.lower() if mode else "mixed"
             
             # 不论什么模式，完成文档上传后都进入媒体上传阶段
-            await update.message.reply_text(
+            await safe_send(
+                update.message.reply_text,
                 "✅ 文档接收完成。\n现在请发送媒体文件（可选）：\n\n"
                 "📱 支持的媒体格式：\n"
                 "• 图片：直接从相册选择发送\n"
@@ -162,8 +180,7 @@ async def done_doc(update: Update, context: CallbackContext) -> int:
             return STATE['MEDIA']
     except Exception as e:
         logger.error(f"检索文档错误: {e}")
-        await update.message.reply_text("❌ 内部错误，请稍后再试")
-        return ConversationHandler.END
+        return await handle_conversation_error(update)
 
 async def prompt_doc(update: Update, context: CallbackContext) -> int:
     """
@@ -179,7 +196,8 @@ async def prompt_doc(update: Update, context: CallbackContext) -> int:
     # 获取允许的文件类型描述
     allowed_types_desc = file_validator.get_allowed_types_description()
     
-    await update.message.reply_text(
+    await safe_send(
+        update.message.reply_text,
         f"请发送文档文件，或发送 /done_doc 完成上传\n\n"
         f"📎 请以文件附件形式发送：\n"
         f"• 点击聊天输入框旁的📎图标\n"

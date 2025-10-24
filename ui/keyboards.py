@@ -255,6 +255,7 @@ class Keyboards:
             ]
         ]
         return InlineKeyboardMarkup(keyboard)
+        return InlineKeyboardMarkup(keyboard)
     
     @staticmethod
     def remove_keyboard():

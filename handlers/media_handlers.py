@@ -9,7 +9,10 @@ from telegram.ext import ConversationHandler, CallbackContext
 
 from models.state import STATE
 from database.db_manager import get_db
-from utils.helper_functions import validate_state
+from utils.helper_functions import (
+    validate_state, end_conversation_with_message, handle_conversation_error,
+    get_submission_mode, parse_json_list
+)
 
 logger = logging.getLogger(__name__)
 
@@ -103,21 +106,11 @@ async def handle_media(update: Update, context: CallbackContext) -> int:
             row = await c.fetchone()
             
             if not row:
-                await update.message.reply_text("❌ 会话已过期，请重新发送 /start")
-                return ConversationHandler.END
+                return await end_conversation_with_message(update, "❌ 会话已过期，请重新发送 /start")
                 
-            # 初始化媒体列表 - 确保即使数据库中为空值也能正确处理
-            media_list = []
-            try:
-                if row["image_id"]:
-                    media_list = json.loads(row["image_id"])
-            except (json.JSONDecodeError, TypeError):
-                # 如果解析失败，创建新的空列表
-                media_list = []
-                
-            # sqlite3.Row 对象不支持 get 方法
-            mode = row["mode"] if "mode" in row.keys() else "mixed"
-            mode = mode.lower() if mode else "mixed"
+            # 初始化媒体列表 - 使用统一的解析函数
+            media_list = parse_json_list(row["image_id"])
+            mode = get_submission_mode(row)
             
             # 根据模式设置不同的限制
             media_limit = 50 if mode == "media" else 10
@@ -147,8 +140,7 @@ async def handle_media(update: Update, context: CallbackContext) -> int:
                 
     except Exception as e:
         logger.error(f"媒体保存错误: {e}")
-        await update.message.reply_text("❌ 媒体保存失败，请稍后再试")
-        return ConversationHandler.END
+        return await handle_conversation_error(update, "❌ 媒体保存失败，请稍后再试")
         
     return STATE['MEDIA']
 
@@ -174,20 +166,11 @@ async def done_media(update: Update, context: CallbackContext) -> int:
             row = await c.fetchone()
             
             if not row:
-                await update.message.reply_text("❌ 会话已过期，请重新发送 /start")
-                return ConversationHandler.END
+                return await end_conversation_with_message(update, "❌ 会话已过期，请重新发送 /start")
             
-            # 检查媒体文件是否存在，增强型错误处理
-            media_list = []
-            try:
-                if row["image_id"]:
-                    media_list = json.loads(row["image_id"])
-            except (json.JSONDecodeError, TypeError):
-                media_list = []
-                
-            # sqlite3.Row 对象不支持 get 方法
-            mode = row["mode"] if "mode" in row.keys() else "mixed"
-            mode = mode.lower() if mode else "mixed"
+            # 检查媒体文件是否存在，使用统一的解析函数
+            media_list = parse_json_list(row["image_id"])
+            mode = get_submission_mode(row)
             
             # 仅媒体模式下要求至少有一个媒体文件
             if mode == "media" and not media_list:
@@ -200,8 +183,7 @@ async def done_media(update: Update, context: CallbackContext) -> int:
         
     except Exception as e:
         logger.error(f"检索媒体错误: {e}")
-        await update.message.reply_text("❌ 内部错误，请稍后再试")
-        return ConversationHandler.END
+        return await handle_conversation_error(update)
 
 @validate_state(STATE['MEDIA'])
 async def skip_media(update: Update, context: CallbackContext) -> int:
@@ -226,12 +208,10 @@ async def skip_media(update: Update, context: CallbackContext) -> int:
             row = await c.fetchone()
             
             if not row:
-                await update.message.reply_text("❌ 会话已过期，请重新发送 /start")
-                return ConversationHandler.END
+                return await end_conversation_with_message(update, "❌ 会话已过期，请重新发送 /start")
                 
-            # sqlite3.Row 对象不支持 get 方法
-            mode = row["mode"] if "mode" in row.keys() else "mixed"
-            mode = mode.lower() if mode else "mixed"
+            # 获取投稿模式
+            mode = get_submission_mode(row)
             
             # 媒体模式下不允许跳过媒体上传
             if mode == "media":
@@ -267,12 +247,10 @@ async def prompt_media(update: Update, context: CallbackContext) -> int:
             row = await c.fetchone()
             
             if not row:
-                await update.message.reply_text("❌ 会话已过期，请重新发送 /start")
-                return ConversationHandler.END
+                return await end_conversation_with_message(update, "❌ 会话已过期，请重新发送 /start")
                 
-            # sqlite3.Row 对象不支持 get 方法
-            mode = row["mode"] if "mode" in row.keys() else "mixed"
-            mode = mode.lower() if mode else "mixed"
+            # 获取投稿模式
+            mode = get_submission_mode(row)
             
             # 根据模式提供不同的提示
             if mode == "media":
