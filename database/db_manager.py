@@ -70,7 +70,8 @@ async def init_db():
                     forwards INTEGER DEFAULT 0,
                     reactions INTEGER DEFAULT 0,
                     heat_score REAL DEFAULT 0,
-                    last_update REAL
+                    last_update REAL,
+                    related_message_ids TEXT
                 )
             ''')
             

@@ -10,8 +10,13 @@ from telegram.ext import ConversationHandler, CallbackContext
 from models.state import STATE
 from database.db_manager import get_db
 from utils.helper_functions import validate_state
+from utils.file_validator import create_file_validator
+from config.settings import ALLOWED_FILE_TYPES
 
 logger = logging.getLogger(__name__)
+
+# 创建全局文件类型验证器
+file_validator = create_file_validator(ALLOWED_FILE_TYPES)
 
 @validate_state(STATE['DOC'])
 async def handle_doc(update: Update, context: CallbackContext) -> int:
@@ -30,16 +35,29 @@ async def handle_doc(update: Update, context: CallbackContext) -> int:
     
     if not update.message.document:
         logger.warning(f"收到非文档消息，但被路由到文档处理，user_id: {user_id}")
+        
+        # 获取允许的文件类型描述
+        allowed_types_desc = file_validator.get_allowed_types_description()
+        
         await update.message.reply_text(
-            "⚠️ 请发送文档文件\n\n"
-            "📎 请以文件附件形式发送：\n"
-            "• 点击聊天输入框旁的📎图标\n"
-            "• 选择文件或文档\n"
-            "• 支持ZIP、RAR等压缩包以及PDF、DOC等各种文档格式"
+            f"⚠️ 请发送文档文件\n\n"
+            f"📎 请以文件附件形式发送：\n"
+            f"• 点击聊天输入框旁的📎图标\n"
+            f"• 选择文件或文档\n\n"
+            f"✅ 允许的文件类型：\n{allowed_types_desc}"
         )
         return STATE['DOC']
     
     doc = update.message.document
+    
+    # 验证文件类型
+    is_valid, error_msg = file_validator.validate(doc.file_name, doc.mime_type)
+    if not is_valid:
+        logger.warning(f"文件类型验证失败: user_id={user_id}, file={doc.file_name}, mime={doc.mime_type}")
+        await update.message.reply_text(error_msg)
+        return STATE['DOC']
+    
+    logger.info(f"文件类型验证通过: user_id={user_id}, file={doc.file_name}, mime={doc.mime_type}")
     new_doc = f"document:{doc.file_id}"
     
     try:
@@ -156,11 +174,14 @@ async def prompt_doc(update: Update, context: CallbackContext) -> int:
     Returns:
         int: 当前会话状态
     """
+    # 获取允许的文件类型描述
+    allowed_types_desc = file_validator.get_allowed_types_description()
+    
     await update.message.reply_text(
-        "请发送文档文件，或发送 /done_doc 完成上传\n\n"
-        "📎 请以文件附件形式发送：\n"
-        "• 点击聊天输入框旁的📎图标\n"
-        "• 选择文件或文档\n"
-        "• 支持ZIP、RAR等压缩包以及PDF、DOC等各种文档格式"
+        f"请发送文档文件，或发送 /done_doc 完成上传\n\n"
+        f"📎 请以文件附件形式发送：\n"
+        f"• 点击聊天输入框旁的📎图标\n"
+        f"• 选择文件或文档\n\n"
+        f"✅ 允许的文件类型：\n{allowed_types_desc}"
     )
     return STATE['DOC']

@@ -18,19 +18,21 @@ from telegram.ext import ConversationHandler, CallbackContext
 from config.settings import CHANNEL_ID, NET_TIMEOUT, OWNER_ID, NOTIFY_OWNER
 from database.db_manager import get_db, cleanup_old_data
 from utils.helper_functions import build_caption, safe_send
+from utils.search_engine import get_search_engine, PostDocument
 
 logger = logging.getLogger(__name__)
 
-async def save_published_post(user_id, message_id, data, media_list, doc_list):
+async def save_published_post(user_id, message_id, data, media_list, doc_list, all_message_ids=None):
     """
-    保存已发布的帖子信息到数据库
+    保存已发布的帖子信息到数据库和搜索索引
     
     Args:
         user_id: 用户ID
-        message_id: 频道消息ID
-        data: 投稿数据
+        message_id: 频道主消息ID
+        data: 投稿数据（sqlite3.Row对象）
         media_list: 媒体列表
         doc_list: 文档列表
+        all_message_ids: 所有相关消息ID列表（用于多组媒体的热度统计）
     """
     try:
         # 确定内容类型
@@ -41,35 +43,81 @@ async def save_published_post(user_id, message_id, data, media_list, doc_list):
         # 获取文件ID列表
         file_ids = json.dumps(media_list if media_list else doc_list)
         
-        # 提取标签（从tags字段）
-        tags = data.get('tags', '')
+        # 提取标签（从tags字段）- 兼容 sqlite3.Row 对象
+        tags = data['tags'] if 'tags' in data.keys() else ''
         
         # 构建说明
         caption = build_caption(data)
         
+        # 提取信息 - 兼容 sqlite3.Row 对象
+        title = data['title'] if data['title'] else ''
+        note = data['note'] if data['note'] else ''
+        link = data['link'] if data['link'] else ''
+        username = data['username'] if 'username' in data.keys() and data['username'] else f'user{user_id}'
+        publish_time = datetime.now()
+        
+        # 处理相关消息ID（用于多组媒体热度统计）
+        related_ids_json = None
+        if all_message_ids and len(all_message_ids) > 1:
+            # 只保存除主消息外的其他消息ID
+            related_ids = [mid for mid in all_message_ids if mid != message_id]
+            if related_ids:
+                related_ids_json = json.dumps(related_ids)
+                logger.info(f"记录{len(related_ids)}个关联消息ID: {related_ids}")
+        
+        # 保存到数据库
         async with get_db() as conn:
             cursor = await conn.cursor()
             await cursor.execute("""
                 INSERT INTO published_posts 
                 (message_id, user_id, username, title, tags, link, note,
-                 content_type, file_ids, caption, publish_time, last_update)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 content_type, file_ids, caption, publish_time, last_update, related_message_ids)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 message_id,
                 user_id,
-                data.get('username', f'user{user_id}'),
-                data.get('title', ''),
+                username,
+                title,
                 tags,
-                data.get('link', ''),
-                data.get('note', ''),
+                link,
+                note,
                 content_type,
                 file_ids,
                 caption,
-                datetime.now().timestamp(),
-                datetime.now().timestamp()
+                publish_time.timestamp(),
+                publish_time.timestamp(),
+                related_ids_json
             ))
             await conn.commit()
             logger.info(f"已保存帖子 {message_id} 到published_posts表")
+        
+        # 添加到搜索索引
+        try:
+            search_engine = get_search_engine()
+            
+            # 构建搜索文档
+            # 将 note 作为 description
+            post_doc = PostDocument(
+                message_id=message_id,
+                title=title,
+                description=note,  # 使用note作为描述
+                tags=tags,
+                link=link,
+                user_id=user_id,
+                username=username,
+                publish_time=publish_time,
+                views=0,
+                heat_score=0
+            )
+            
+            # 添加到索引
+            search_engine.add_post(post_doc)
+            logger.info(f"已添加帖子 {message_id} 到搜索索引")
+            
+        except Exception as e:
+            logger.error(f"添加到搜索索引失败: {e}", exc_info=True)
+            # 继续执行，不影响发布流程
+            
     except Exception as e:
         logger.error(f"保存帖子信息到数据库失败: {e}")
 
@@ -127,24 +175,29 @@ async def publish_submission(update: Update, context: CallbackContext) -> int:
 
         spoiler_flag = True if data["spoiler"].lower() == "true" else False
         sent_message = None
+        all_message_ids = []  # 用于记录所有发送的消息ID
         
         # 处理媒体文件
         if media_list:
-            sent_message = await handle_media_publish(context, media_list, caption, spoiler_flag)
+            sent_message, all_message_ids = await handle_media_publish(context, media_list, caption, spoiler_flag)
         
         # 处理文档文件
         if doc_list:
             if sent_message:
                 # 如果已经发送了媒体，则文档作为回复
-                await handle_document_publish(
+                doc_msg = await handle_document_publish(
                     context, 
                     doc_list, 
                     None,  # 不需要重复发送说明，回复到主贴即可
                     sent_message.message_id
                 )
+                if doc_msg:
+                    all_message_ids.append(doc_msg.message_id)
             else:
                 # 如果只有文档，直接发送
                 sent_message = await handle_document_publish(context, doc_list, caption)
+                if sent_message:
+                    all_message_ids.append(sent_message.message_id)
         
         # 处理结果
         if not sent_message:
@@ -163,7 +216,7 @@ async def publish_submission(update: Update, context: CallbackContext) -> int:
         )
         
         # 保存已发布的帖子信息到数据库（用于热度统计和搜索）
-        await save_published_post(user_id, sent_message.message_id, data, media_list, doc_list)
+        await save_published_post(user_id, sent_message.message_id, data, media_list, doc_list, all_message_ids)
         
         # 向所有者发送投稿通知
         if NOTIFY_OWNER and OWNER_ID:
@@ -215,10 +268,8 @@ async def publish_submission(update: Update, context: CallbackContext) -> int:
             )
             
             try:
-                # 确保OWNER_ID被转换为整数
-                logger.info(f"尝试将OWNER_ID转换为整数: {OWNER_ID}")
-                owner_id_int = int(OWNER_ID)
-                logger.info(f"转换成功，准备发送通知到: {owner_id_int}")
+                # OWNER_ID 已经在配置中转换为整数类型，直接使用
+                logger.info(f"准备发送通知到所有者: {OWNER_ID}")
                 
                 # 记录通知消息内容
                 logger.info(f"通知消息长度: {len(notification_text)}, 使用纯文本格式")
@@ -226,7 +277,7 @@ async def publish_submission(update: Update, context: CallbackContext) -> int:
                 # 简化尝试逻辑 - 直接使用纯文本，不尝试任何格式化
                 try:
                     message = await context.bot.send_message(
-                        chat_id=owner_id_int,
+                        chat_id=OWNER_ID,
                         text=notification_text
                     )
                     logger.info(f"通知发送成功！消息ID: {message.message_id}")
@@ -236,7 +287,7 @@ async def publish_submission(update: Update, context: CallbackContext) -> int:
                     try:
                         simple_msg = f"📨 新投稿通知 - 用户 {real_username} (ID: {user_id}) 发布了新投稿\n链接: {submission_link}\n\n封禁命令: /blacklist_add {user_id} 违规内容"
                         await context.bot.send_message(
-                            chat_id=owner_id_int,
+                            chat_id=OWNER_ID,
                             text=simple_msg
                         )
                         logger.info("使用简化消息成功发送通知")
@@ -246,11 +297,8 @@ async def publish_submission(update: Update, context: CallbackContext) -> int:
                         await update.message.reply_text(
                             "⚠️ 投稿已发布，但无法通知管理员。请直接联系管理员。"
                         )
-            except ValueError as e:
-                logger.error(f"OWNER_ID格式不正确，无法转换为整数: {OWNER_ID}, 错误: {e}")
-                await update.message.reply_text(f"⚠️ 配置错误：OWNER_ID格式不正确。请联系开发者修复配置。")
             except Exception as e:
-                logger.error(f"处理通知过程中发生其他错误: 错误类型: {type(e)}, 详细信息: {str(e)}")
+                logger.error(f"处理通知过程中发生错误: 错误类型: {type(e)}, 详细信息: {str(e)}")
                 logger.error("异常追踪: ", exc_info=True)
         else:
             logger.info(f"不发送通知: NOTIFY_OWNER={NOTIFY_OWNER}, OWNER_ID={OWNER_ID}")
@@ -284,7 +332,7 @@ async def handle_media_publish(context, media_list, caption, spoiler_flag):
         spoiler_flag: 是否剧透标志
         
     Returns:
-        发送的消息对象或None
+        tuple: (主消息对象, 所有消息ID列表) 或 (None, [])
     """
     # 检查caption长度，如果过长先单独发送
     caption_message = None
@@ -354,10 +402,19 @@ async def handle_media_publish(context, media_list, caption, spoiler_flag):
                     reply_to_message_id=caption_message.message_id if caption_message else None
                 )
             
-            return caption_message or sent_message
+            # 收集所有消息ID
+            main_msg = caption_message or sent_message
+            all_ids = []
+            if caption_message:
+                all_ids.append(caption_message.message_id)
+            if sent_message:
+                all_ids.append(sent_message.message_id)
+            return (main_msg, all_ids)
         except Exception as e:
             logger.error(f"发送单条媒体失败: {e}")
-            return caption_message  # 如果至少发送了caption消息，则返回它
+            if caption_message:
+                return (caption_message, [caption_message.message_id])
+            return (None, [])
     
     # 多个媒体处理 - 将媒体分组，每组最多10个
     else:
@@ -484,11 +541,20 @@ async def handle_media_publish(context, media_list, caption, spoiler_flag):
             else:
                 logger.info(f"所有媒体发送完成，{success_groups}/{total_groups}组成功，共{len(all_sent_messages)}个媒体项目成功记录")
             
-            # 返回第一条消息或任何成功发送的消息
-            return first_message if first_message else (all_sent_messages[0] if all_sent_messages else None)
+            # 收集所有消息ID
+            all_message_ids = []
+            if caption_message:
+                all_message_ids.append(caption_message.message_id)
+            all_message_ids.extend([msg.message_id for msg in all_sent_messages])
+            
+            # 返回主消息和所有消息ID
+            main_msg = first_message if first_message else (all_sent_messages[0] if all_sent_messages else None)
+            return (main_msg, all_message_ids)
         except Exception as e:
             logger.error(f"发送媒体组失败: {e}")
-            return caption_message  # 如果至少发送了caption消息，则返回它
+            if caption_message:
+                return (caption_message, [caption_message.message_id])
+            return (None, [])
 
 async def handle_document_publish(context, doc_list, caption=None, reply_to_message_id=None):
     """

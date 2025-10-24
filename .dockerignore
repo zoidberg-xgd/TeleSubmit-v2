@@ -34,6 +34,14 @@ logs/
 *.db-wal
 data/
 
+# 搜索索引（部署时会使用volume挂载）
+search_index/
+data/search_index/
+*.seg
+*.toc
+*.dci
+*.dcz
+
 # Git
 .git/
 .gitignore
@@ -44,9 +52,15 @@ Dockerfile
 .dockerignore
 docker-compose.yml
 
-# 文档
-README.md
-CHANGELOG.md
+# 脚本文件（在镜像中不需要）
+deploy.sh
+start.sh
+quickstart.sh
+setup_wizard.py
+check_config.py
+cleanup_duplicates.py
+
+# 文档（大部分不需要包含在镜像中）
 *.md
 docs/
 
@@ -58,9 +72,13 @@ tests/
 test_*.py
 *_test.py
 
+# 备份文件
+backups/
+*.bak
+
 # 其他
 .DS_Store
-*.bak
 *.tmp
 .env
+Makefile
 

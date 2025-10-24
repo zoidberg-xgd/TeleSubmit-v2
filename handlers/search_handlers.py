@@ -6,16 +6,18 @@ import logging
 from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext
+from whoosh.query import DateRange
 
 from config.settings import CHANNEL_ID
 from database.db_manager import get_db
+from utils.search_engine import get_search_engine
 
 logger = logging.getLogger(__name__)
 
 
 async def search_posts(update: Update, context: CallbackContext):
     """
-    搜索已发布的帖子
+    搜索已发布的帖子 - 使用全文搜索引擎（支持中文分词）
     
     命令格式：
     /search <关键词> [选项]
@@ -52,14 +54,15 @@ async def search_posts(update: Update, context: CallbackContext):
                 "选项：\n"
                 "• -t day/week/month - 时间范围\n"
                 "• -n <数量> - 结果数量（最多30）\n\n"
-                "💡 使用 /tags 查看所有标签"
+                "💡 使用 /tags 查看所有标签\n"
+                "✨ 新功能：支持中文分词，搜索更智能！"
             )
             return
         
         # 解析搜索参数
         args = context.args
         keyword = None
-        time_filter = None
+        time_filter_str = None
         limit = 10
         
         i = 0
@@ -68,7 +71,7 @@ async def search_posts(update: Update, context: CallbackContext):
             
             if arg == '-t' and i + 1 < len(args):
                 # 时间过滤选项
-                time_filter = args[i + 1].lower()
+                time_filter_str = args[i + 1].lower()
                 i += 2
             elif arg == '-n' and i + 1 < len(args):
                 # 数量限制选项
@@ -91,92 +94,86 @@ async def search_posts(update: Update, context: CallbackContext):
         
         # 检查是否是标签搜索
         is_tag_search = keyword.startswith('#')
+        tag_filter = None
         if is_tag_search:
-            keyword = keyword.lstrip('#')
+            tag_filter = keyword.lstrip('#')
+            keyword = tag_filter  # 也搜索关键词
         
-        # 构建查询
-        query = "SELECT * FROM published_posts WHERE 1=1"
-        query_params = []
+        # 构建时间过滤器
+        time_filter = None
+        time_desc = ""
         
-        # 时间过滤
-        if time_filter == 'day':
-            cutoff = (datetime.now() - timedelta(days=1)).timestamp()
-            query += " AND publish_time > ?"
-            query_params.append(cutoff)
+        if time_filter_str == 'day':
+            start_time = datetime.now() - timedelta(days=1)
+            time_filter = DateRange("publish_time", start_time, None)
             time_desc = "今日"
-        elif time_filter == 'week':
-            cutoff = (datetime.now() - timedelta(days=7)).timestamp()
-            query += " AND publish_time > ?"
-            query_params.append(cutoff)
+        elif time_filter_str == 'week':
+            start_time = datetime.now() - timedelta(days=7)
+            time_filter = DateRange("publish_time", start_time, None)
             time_desc = "本周"
-        elif time_filter == 'month':
-            cutoff = (datetime.now() - timedelta(days=30)).timestamp()
-            query += " AND publish_time > ?"
-            query_params.append(cutoff)
+        elif time_filter_str == 'month':
+            start_time = datetime.now() - timedelta(days=30)
+            time_filter = DateRange("publish_time", start_time, None)
             time_desc = "本月"
-        else:
-            time_desc = ""
         
-        # 关键词搜索
-        if is_tag_search:
-            # 标签搜索：在tags字段中查找
-            query += " AND tags LIKE ?"
-            query_params.append(f'%"{keyword}"%')
-        else:
-            # 全文搜索：标题、描述、标签
-            query += " AND (title LIKE ? OR description LIKE ? OR tags LIKE ?)"
-            search_pattern = f'%{keyword}%'
-            query_params.extend([search_pattern, search_pattern, search_pattern])
+        # 使用搜索引擎
+        search_engine = get_search_engine()
         
-        # 按发布时间排序
-        query += " ORDER BY publish_time DESC LIMIT ?"
-        query_params.append(limit)
+        # 执行搜索
+        search_result = search_engine.search(
+            query_str=keyword,
+            page_num=1,
+            page_len=limit,
+            time_filter=time_filter,
+            tag_filter=tag_filter if is_tag_search else None,
+            sort_by="publish_time"
+        )
         
-        async with get_db() as conn:
-            cursor = await conn.cursor()
-            await cursor.execute(query, query_params)
-            results = await cursor.fetchall()
-        
-        if not results:
-            search_desc = f"标签 #{keyword}" if is_tag_search else f"关键词 \"{keyword}\""
+        if not search_result.hits:
+            search_desc = f"标签 #{tag_filter}" if is_tag_search else f"关键词 \"{keyword}\""
             await update.message.reply_text(
                 f"🔍 未找到匹配{time_desc}{search_desc}的帖子"
             )
             return
         
         # 构建结果消息
-        search_desc = f"#{keyword}" if is_tag_search else f"\"{keyword}\""
+        search_desc = f"#{tag_filter}" if is_tag_search else f"\"{keyword}\""
         time_prefix = f"{time_desc} " if time_desc else ""
         message = f"🔍 搜索结果：{time_prefix}{search_desc}\n"
-        message += f"找到 {len(results)} 个结果\n\n"
+        message += f"找到 {search_result.total_results} 个结果（显示前 {len(search_result.hits)} 个）\n\n"
         
-        for idx, post in enumerate(results, 1):
+        for idx, hit in enumerate(search_result.hits, 1):
             # 生成帖子链接
             if CHANNEL_ID.startswith('@'):
                 channel_username = CHANNEL_ID.lstrip('@')
-                post_link = f"https://t.me/{channel_username}/{post['message_id']}"
+                post_link = f"https://t.me/{channel_username}/{hit.message_id}"
             else:
-                post_link = f"消息ID: {post['message_id']}"
+                post_link = f"消息ID: {hit.message_id}"
             
             # 解析标签
             try:
-                tags = json.loads(post['tags']) if post['tags'] else []
+                tags = json.loads(hit.tags) if hit.tags else []
                 tags_preview = ' '.join([f"#{tag}" for tag in tags[:3]])
             except:
-                tags_preview = ""
+                tags_preview = hit.tags[:50] if hit.tags else ""
             
-            title = post['title'] or '无标题'
+            # 使用高亮标题（如果有）
+            title = hit.highlighted_title or hit.title or '无标题'
+            # 清理HTML标签用于长度计算
+            import re
+            title_clean = re.sub(r'<[^>]+>', '', title)
+            
             # 标题过长则截断
-            if len(title) > 40:
-                title = title[:37] + '...'
+            if len(title_clean) > 40:
+                title = title[:60] + '...'  # 考虑HTML标签，使用更大的截断长度
             
             # 发布时间
-            publish_date = datetime.fromtimestamp(post['publish_time']).strftime('%Y-%m-%d')
+            publish_date = hit.publish_time.strftime('%Y-%m-%d')
             
             message += (
                 f"{idx}. {title}\n"
                 f"   {tags_preview}\n"
-                f"   📅 {publish_date} | 👀 {post['views']} | 🔥 {post['heat_score']:.0f}\n"
+                f"   📅 {publish_date} | 👀 {hit.views} | 🔥 {hit.heat_score:.0f}\n"
                 f"   🔗 {post_link}\n\n"
             )
             
@@ -185,11 +182,96 @@ async def search_posts(update: Update, context: CallbackContext):
                 message += "...\n\n结果过多，请使用更具体的关键词"
                 break
         
-        await update.message.reply_text(message, disable_web_page_preview=True)
+        await update.message.reply_text(message, disable_web_page_preview=True, parse_mode='HTML')
         
     except Exception as e:
-        logger.error(f"搜索帖子失败: {e}")
+        logger.error(f"搜索帖子失败: {e}", exc_info=True)
         await update.message.reply_text("❌ 搜索失败，请稍后重试")
+
+
+async def search_posts_by_tag(update: Update, context: CallbackContext, tag: str = None):
+    """
+    按标签搜索帖子（回调查询专用）
+    
+    Args:
+        update: Telegram 更新对象
+        context: 回调上下文
+        tag: 要搜索的标签
+    """
+    # 如果没有提供标签，从context.args获取
+    if tag is None:
+        if not context.args:
+            await update.message.reply_text("❌ 请提供要搜索的标签")
+            return
+        tag = context.args[0]
+    
+    # 移除标签前面的#号（如果有）并转换为小写
+    tag = tag.lstrip('#').lower()
+    
+    try:
+        # 使用搜索引擎
+        search_engine = get_search_engine()
+        
+        # 执行标签搜索
+        search_result = search_engine.search(
+            query_str=tag,  # 关键词也搜索标签内容
+            page_num=1,
+            page_len=10,
+            tag_filter=tag,  # 使用标签过滤
+            sort_by="publish_time"
+        )
+        
+        if not search_result.hits:
+            # 根据update类型选择回复方式
+            if hasattr(update, 'callback_query') and update.callback_query:
+                await update.callback_query.message.reply_text(f"🔍 未找到标签 #{tag} 的帖子")
+            else:
+                await update.message.reply_text(f"🔍 未找到标签 #{tag} 的帖子")
+            return
+        
+        # 构建结果消息
+        message = f"🏷️ 标签搜索结果：#{tag}\n"
+        message += f"找到 {search_result.total_results} 个结果（显示前 {len(search_result.hits)} 个）\n\n"
+        
+        for idx, hit in enumerate(search_result.hits, 1):
+            # 生成帖子链接
+            if CHANNEL_ID.startswith('@'):
+                channel_username = CHANNEL_ID.lstrip('@')
+                post_link = f"https://t.me/{channel_username}/{hit.message_id}"
+            else:
+                post_link = f"消息ID: {hit.message_id}"
+            
+            title = hit.title or '无标题'
+            if len(title) > 40:
+                title = title[:37] + '...'
+            
+            # 发布时间
+            publish_date = hit.publish_time.strftime('%Y-%m-%d')
+            
+            message += (
+                f"{idx}. {title}\n"
+                f"   📅 {publish_date} | 👀 {hit.views} | 🔥 {hit.heat_score:.0f}\n"
+                f"   🔗 {post_link}\n\n"
+            )
+            
+            # 防止消息过长
+            if len(message) > 3500:
+                message += "...\n\n结果过多，请使用更具体的关键词"
+                break
+        
+        # 根据update类型选择回复方式
+        if hasattr(update, 'callback_query') and update.callback_query:
+            await update.callback_query.message.reply_text(message, disable_web_page_preview=True)
+        else:
+            await update.message.reply_text(message, disable_web_page_preview=True)
+        
+    except Exception as e:
+        logger.error(f"按标签搜索失败: {e}", exc_info=True)
+        # 根据update类型选择回复方式
+        if hasattr(update, 'callback_query') and update.callback_query:
+            await update.callback_query.message.reply_text("❌ 搜索失败，请稍后重试")
+        else:
+            await update.message.reply_text("❌ 搜索失败，请稍后重试")
 
 
 async def get_tag_cloud(update: Update, context: CallbackContext):
@@ -228,11 +310,20 @@ async def get_tag_cloud(update: Update, context: CallbackContext):
         tag_counts = {}
         for post in posts:
             try:
+                # 尝试作为 JSON 解析（兼容旧数据）
                 tags = json.loads(post['tags'])
                 for tag in tags:
                     tag_counts[tag] = tag_counts.get(tag, 0) + 1
             except:
-                continue
+                # 如果不是 JSON，按空格分割（当前格式：'#测试 #标签2'）
+                tags_text = post['tags']
+                if tags_text:
+                    tags = tags_text.split()
+                    for tag in tags:
+                        # 移除 # 前缀，统一处理
+                        tag_clean = tag.lstrip('#')
+                        if tag_clean:
+                            tag_counts[tag_clean] = tag_counts.get(tag_clean, 0) + 1
         
         if not tag_counts:
             await update.message.reply_text("📊 暂无标签数据")
@@ -368,9 +459,10 @@ async def search_by_user(update: Update, context: CallbackContext):
         context: 回调上下文
     """
     from config.settings import OWNER_ID
+    from utils.blacklist import is_owner
     
-    # 仅管理员可用
-    if update.effective_user.id != OWNER_ID:
+    # 仅管理员可用（使用is_owner函数确保正确比较）
+    if not is_owner(update.effective_user.id):
         await update.message.reply_text("❌ 此命令仅管理员可用")
         return
     

@@ -1,41 +1,43 @@
 [BOT]
-# Telegram机器人令牌，从BotFather获取
-# 格式类似：1234567890:ABCDEFGHIJKLMNOPQRSTUVWXYZ
+# Telegram Bot Token (从 @BotFather 获取)
 TOKEN = your_bot_token_here
 
-# 目标频道ID，格式为@channel_username或-100开头的ID
-# 例如：@your_channel 或 -1001234567890
-CHANNEL_ID = @your_channel_name
+# 频道 ID (格式: @channel_username 或 -100xxxxxxxxxx)
+CHANNEL_ID = @your_channel
 
-# 数据库文件路径，相对于程序所在目录
-# 默认为submissions.db
-DB_PATH = submissions.db
+# 数据库文件路径
+DB_PATH = data/submissions.db
 
 # 会话超时时间（秒）
-# 用户在此时间内未操作则会话自动结束
 TIMEOUT = 300
 
-# 最多允许的标签数量
-# 用户提交的标签超过此数量会被截断
+# 允许的最大标签数量
 ALLOWED_TAGS = 30
 
-# 机器人工作模式，可选值:
-# MEDIA - 仅支持媒体投稿（图片、视频、GIF等）
-# DOCUMENT - 仅支持文档投稿（PDF、DOC等）
-# MIXED - 混合模式，用户可以选择投稿类型
+# 机器人所有者的 Telegram User ID
+OWNER_ID = your_user_id
+
+# 是否在投稿中显示投稿人信息 (true/false)
+SHOW_SUBMITTER = true
+
+# 是否向所有者发送新投稿通知 (true/false)
+NOTIFY_OWNER = true
+
+# 机器人模式: MEDIA (仅媒体), DOCUMENT (仅文档), MIXED (混合模式)
 BOT_MODE = MIXED
 
-# 机器人所有者的Telegram用户ID
-# 必须是数字ID，不能是用户名
-# 使用@userinfobot或@RawDataBot获取您的用户ID
-OWNER_ID = your_user_id_here
+# 允许上传的文档文件类型（MIME类型或文件扩展名，逗号分隔）
+# 留空或设为 * 表示允许所有类型
+# 示例1 - 小说类: ALLOWED_FILE_TYPES = .txt,.epub,.mobi,.azw3,.pdf
+# 示例2 - 压缩包: ALLOWED_FILE_TYPES = .zip,.rar,.7z,.tar,.gz
+# 示例3 - Office文档: ALLOWED_FILE_TYPES = .doc,.docx,.xls,.xlsx,.ppt,.pptx,.pdf
+# 示例4 - 使用MIME类型: ALLOWED_FILE_TYPES = application/pdf,application/zip
+# 示例5 - 允许所有: ALLOWED_FILE_TYPES = *
+ALLOWED_FILE_TYPES = *
 
-# 是否在投稿内容尾部显示投稿人信息
-# True - 显示投稿人链接
-# False - 不显示投稿人信息
-SHOW_SUBMITTER = True
+[SEARCH]
+# 搜索索引目录
+INDEX_DIR = data/search_index
 
-# 是否向所有者发送投稿通知
-# True - 有新投稿时向所有者发送通知，包含用户ID和投稿链接
-# False - 不发送通知
-NOTIFY_OWNER = True 
+# 是否启用搜索功能
+ENABLED = true

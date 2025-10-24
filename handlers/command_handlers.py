@@ -45,9 +45,119 @@ async def cancel(update: Update, context: CallbackContext) -> int:
     await update.message.reply_text("❌ 投稿已取消")
     return ConversationHandler.END
 
+async def help_command(update: Update, context: CallbackContext):
+    """
+    帮助命令，显示机器人使用说明
+    
+    Args:
+        update: Telegram 更新对象
+        context: 回调上下文
+    """
+    logger.info(f"帮助命令被调用: 用户ID={update.effective_user.id}")
+    
+    user_id = update.effective_user.id
+    is_admin = is_owner(user_id)
+    
+    # 基础帮助信息（所有用户可见）
+    basic_help = """
+📚 <b>使用指南</b>
+
+<b>📝 投稿相关：</b>
+/submit - 开始新投稿
+/cancel - 取消当前投稿
+
+<b>📊 统计查询：</b>
+/hot - 查看热门内容
+/mystats - 我的投稿统计
+/myposts - 我的投稿列表
+
+<b>🔍 搜索功能：</b>
+/search &lt;关键词&gt; - 搜索内容
+/tags - 查看热门标签云
+
+<b>ℹ️ 其他：</b>
+/help - 显示此帮助
+/settings - 查看机器人设置
+"""
+    
+    # 管理员专属帮助（仅管理员可见）
+    admin_help = """
+<b>👑 管理员专属命令：</b>
+/debug - 查看系统调试信息
+/blacklist_add &lt;ID&gt; [原因] - 添加黑名单
+/blacklist_remove &lt;ID&gt; - 移除黑名单
+/blacklist_list - 查看黑名单列表
+/searchuser &lt;ID&gt; - 查询用户投稿
+
+<b>💡 管理面板：</b>
+发送 /start 后点击"👑 管理面板"按钮
+"""
+    
+    footer = """
+💡 <b>小贴士：</b>
+• 使用下方菜单按钮快速访问功能
+• 投稿支持文字、图片、视频等多种格式
+• 添加 #标签 让内容更易被发现
+"""
+    
+    # 根据用户身份组合消息
+    if is_admin:
+        help_text = basic_help + admin_help + footer
+    else:
+        help_text = basic_help + footer
+    
+    try:
+        await update.message.reply_text(help_text, parse_mode="HTML")
+    except Exception as e:
+        logger.error(f"发送帮助信息失败: {e}")
+        await update.message.reply_text("❌ 发送帮助信息失败，请稍后重试")
+
+
+async def settings(update: Update, context: CallbackContext):
+    """
+    设置命令，显示机器人配置信息
+    
+    Args:
+        update: Telegram 更新对象
+        context: 回调上下文
+    """
+    logger.info(f"设置命令被调用: 用户ID={update.effective_user.id}")
+    
+    user_id = update.effective_user.id
+    
+    try:
+        from config.settings import CHANNEL_ID, BOT_MODE, SHOW_SUBMITTER, TIMEOUT, ALLOWED_TAGS
+        
+        # 基础设置信息（所有用户可见）
+        settings_info = f"""
+⚙️ <b>机器人设置</b>
+
+<b>📺 频道信息：</b>
+• 频道ID: <code>{CHANNEL_ID}</code>
+
+<b>🔄 投稿设置：</b>
+• 机器人模式: {BOT_MODE}
+• 最大标签数: {ALLOWED_TAGS}
+• 会话超时: {TIMEOUT}秒
+
+<b>👁️ 隐私设置：</b>
+• 显示投稿人: {'是' if SHOW_SUBMITTER else '否'}
+
+<b>💡 说明：</b>
+• MEDIA - 仅支持图片/视频
+• DOCUMENT - 仅支持文档
+• MIXED - 支持所有类型
+"""
+        
+        await update.message.reply_text(settings_info, parse_mode="HTML")
+    except Exception as e:
+        logger.error(f"发送设置信息失败: {e}")
+        await update.message.reply_text("❌ 获取设置信息失败，请稍后重试")
+
+
 async def debug(update: Update, context: CallbackContext):
     """
-    调试命令，显示当前状态信息
+    调试命令，显示系统调试信息（仅管理员可用）
     
     Args:
         update: Telegram 更新对象
@@ -55,15 +165,20 @@ async def debug(update: Update, context: CallbackContext):
     """
     logger.info(f"调试命令被调用: 用户ID={update.effective_user.id}")
     
-    # 获取用户ID
     user_id = update.effective_user.id
+    
+    # 检查权限
+    if not is_owner(user_id):
+        logger.warning(f"非管理员用户 {user_id} 尝试使用调试命令")
+        await update.message.reply_text("⛔ 此命令仅限管理员使用\n\n使用 /help 查看可用命令")
+        return
     
     # 构建调试信息
     try:
         from config.settings import OWNER_ID, CHANNEL_ID, BOT_MODE, SHOW_SUBMITTER, NOTIFY_OWNER
         
         debug_info = (
-            "🔍 **调试信息**\n\n"
+            "🔍 **系统调试信息**\n\n"
             f"👤 您的用户ID: `{user_id}`\n"
             f"🤖 机器人所有者ID: `{OWNER_ID}`\n"
             f"✅ 您是所有者: {is_owner(user_id)}\n\n"
@@ -83,6 +198,7 @@ async def debug(update: Update, context: CallbackContext):
         
         try:
             process = psutil.Process()
+            memory_info = psutil.virtual_memory()
             memory_usage = process.memory_info().rss / 1024 / 1024  # MB
             cpu_percent = process.cpu_percent(interval=0.1)
             uptime = (datetime.now() - datetime.fromtimestamp(process.create_time())).total_seconds() / 60  # 分钟
@@ -91,8 +207,9 @@ async def debug(update: Update, context: CallbackContext):
                 "\n📊 **系统信息**\n\n"
                 f"💻 操作系统: {platform.system()} {platform.release()}\n"
                 f"🐍 Python版本: {platform.python_version()}\n"
-                f"📈 CPU使用率: {cpu_percent:.1f}%\n"
-                f"🧠 内存使用: {memory_usage:.1f} MB\n"
+                f"📈 进程CPU: {cpu_percent:.1f}%\n"
+                f"🧠 进程内存: {memory_usage:.1f} MB\n"
+                f"💾 系统内存: {memory_info.percent:.1f}% ({memory_info.used/1024/1024/1024:.1f}GB/{memory_info.total/1024/1024/1024:.1f}GB)\n"
                 f"⏲️ 运行时间: {int(uptime)} 分钟\n"
             )
             
