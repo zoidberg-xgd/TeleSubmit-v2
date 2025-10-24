@@ -533,7 +533,7 @@ async def execute_delete_post(query, message_id: str, context: CallbackContext):
             
             # 根据 message_id 获取帖子信息
             await cursor.execute(
-                "SELECT id, message_id, related_message_ids FROM published_posts WHERE message_id=?",
+                "SELECT rowid, message_id, related_message_ids FROM published_posts WHERE message_id=?",
                 (int(message_id),)
             )
             post_row = await cursor.fetchone()
@@ -543,7 +543,7 @@ async def execute_delete_post(query, message_id: str, context: CallbackContext):
                 logger.warning(f"尝试删除不存在的帖子: message_id={message_id}")
                 return
             
-            post_id = post_row['id']
+            post_id = post_row['rowid']
             related_ids_json = post_row['related_message_ids']
             
             # 从搜索索引中删除
@@ -573,7 +573,7 @@ async def execute_delete_post(query, message_id: str, context: CallbackContext):
                 # 继续执行，不因索引删除失败而中断
             
             # 从数据库删除记录
-            await cursor.execute("DELETE FROM published_posts WHERE id=?", (post_id,))
+            await cursor.execute("DELETE FROM published_posts WHERE rowid=?", (post_id,))
             await conn.commit()
             logger.info(f"已从数据库删除帖子记录: ID={post_id}, message_id={message_id}")
             
