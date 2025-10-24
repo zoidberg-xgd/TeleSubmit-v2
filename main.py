@@ -56,7 +56,7 @@ from handlers.command_handlers import blacklist_add, blacklist_remove, blacklist
 from handlers.publish import publish_submission
 
 # 不同投稿模式支持
-from handlers.mode_selection import select_mode
+from handlers.mode_selection import submit, start, select_mode
 from handlers.document_handlers import handle_doc, done_doc, prompt_doc
 from handlers.media_handlers import handle_media, done_media, skip_media, prompt_media
 from handlers.submit_handlers import (
@@ -360,12 +360,15 @@ def setup_application(application):
     application.add_handler(MessageHandler(filters.ALL, check_conversation_timeout), group=0)
     
     try:
+        # 添加独立的 /start 命令处理器（只显示欢迎信息）
+        logger.info("注册 /start 命令处理器...")
+        application.add_handler(CommandHandler("start", start), group=1)
+        
         # 添加会话处理器
         logger.info("注册会话处理器...")
         conv_handler = ConversationHandler(
             entry_points=[
-                CommandHandler("submit", start),
-                CommandHandler("start", start)  # 确保/start也是入口点
+                CommandHandler("submit", submit)
             ],
             states={
                 # 模式选择状态

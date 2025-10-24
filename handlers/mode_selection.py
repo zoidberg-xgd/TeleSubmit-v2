@@ -13,9 +13,9 @@ from utils.blacklist import is_blacklisted
 
 logger = logging.getLogger(__name__)
 
-async def start(update: Update, context: CallbackContext) -> int:
+async def submit(update: Update, context: CallbackContext) -> int:
     """
-    处理 /start 命令，初始化会话
+    处理 /submit 命令，开始投稿流程
     
     Args:
         update: Telegram 更新对象
@@ -24,7 +24,7 @@ async def start(update: Update, context: CallbackContext) -> int:
     Returns:
         int: 下一个会话状态
     """
-    logger.info(f"收到 /start 命令，user_id: {update.effective_user.id}")
+    logger.info(f"收到 /submit 命令，user_id: {update.effective_user.id}")
     await cleanup_old_data()
     user_id = update.effective_user.id
     
@@ -87,7 +87,7 @@ async def start(update: Update, context: CallbackContext) -> int:
                     "- 📄 文档投稿：用于提交压缩包、PDF、DOC等文档文件\n"
                     "  适用场景：通过文件附件方式发送各类压缩包资源、文档或原始媒体文件\n"
                     "  注意：如果您需要以文件附件形式上传媒体，请选择此模式\n\n"
-                    "⏱️ 操作超时提醒：如果5分钟内没有操作，会话将自动结束，需要重新发送 /start。",
+                    "⏱️ 操作超时提醒：如果5分钟内没有操作，会话将自动结束，需要重新发送 /submit。",
                     reply_markup=markup
                 )
                 logger.info(f"已发送模式选择提示，切换到START_MODE状态，user_id: {user_id}")
@@ -96,6 +96,61 @@ async def start(update: Update, context: CallbackContext) -> int:
         logger.error(f"初始化数据错误: {e}", exc_info=True)
         await update.message.reply_text("❌ 初始化失败，请稍后再试")
         return ConversationHandler.END
+
+async def start(update: Update, context: CallbackContext) -> int:
+    """
+    处理 /start 命令，显示欢迎信息和可用操作
+    
+    Args:
+        update: Telegram 更新对象
+        context: 回调上下文
+        
+    Returns:
+        int: 结束会话
+    """
+    logger.info(f"收到 /start 命令，user_id: {update.effective_user.id}")
+    await cleanup_old_data()
+    user_id = update.effective_user.id
+    
+    # 获取用户名信息
+    user = update.effective_user
+    username = user.username or user.first_name or f"user{user.id}"
+    
+    # 检查用户是否在黑名单中
+    if is_blacklisted(user_id):
+        logger.warning(f"黑名单用户尝试使用机器人，user_id: {user_id}")
+        await update.message.reply_text("⚠️ 您已被列入黑名单，无法使用投稿功能。如有疑问，请联系管理员。")
+        return ConversationHandler.END
+    
+    # 显示欢迎信息和可用操作
+    welcome_message = f"👋 你好 {username}！欢迎使用投稿机器人！\n\n"
+    welcome_message += "🤖 **我能做什么？**\n\n"
+    welcome_message += "📮 **投稿功能**\n"
+    welcome_message += "• /submit - 开始新投稿\n"
+    welcome_message += "  支持媒体投稿（图片/视频）和文档投稿（压缩包/PDF等）\n\n"
+    
+    welcome_message += "📊 **查询功能**\n"
+    welcome_message += "• /search - 搜索历史投稿\n"
+    welcome_message += "• /mystats - 查看我的投稿统计\n"
+    welcome_message += "• /myposts - 查看我的投稿列表\n\n"
+    
+    welcome_message += "🔥 **热门排行**\n"
+    welcome_message += "• /hot - 查看热门投稿排行榜\n"
+    welcome_message += "• /tags - 查看热门标签云\n\n"
+    
+    welcome_message += "❓ **帮助**\n"
+    welcome_message += "• /help - 查看完整帮助信息\n"
+    welcome_message += "• /cancel - 取消当前投稿\n\n"
+    
+    welcome_message += "💡 **快速开始**\n"
+    welcome_message += "想要投稿？直接发送 /submit 命令即可开始！"
+    
+    await update.message.reply_text(
+        welcome_message,
+        parse_mode='Markdown'
+    )
+    logger.info(f"已发送欢迎信息，user_id: {user_id}")
+    return ConversationHandler.END
 
 async def select_mode(update: Update, context: CallbackContext) -> int:
     """
