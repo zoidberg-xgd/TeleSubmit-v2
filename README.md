@@ -16,7 +16,7 @@ Telegram 频道投稿机器人，支持媒体上传、全文搜索、热度统�
 - **磁盘**: 100 MB 以上
 - **Python**: 3.9+（推荐 3.11）
 
-详细内存占用分析请查看 [内存占用说明](MEMORY_USAGE.md)。
+
 
 ## 快速开始
 
@@ -313,6 +313,7 @@ TeleSubmit-v2/
 | [部署指南](DEPLOYMENT.md) | 详细部署步骤、故障排查 |
 | [管理员指南](ADMIN_GUIDE.md) | 管理功能、系统维护 |
 | [索引管理器](INDEX_MANAGER_README.md) | 搜索索引管理工具 |
+| [内存占用说明](MEMORY_USAGE.md) | 内存使用分析与优化 |
 | [更新日志](CHANGELOG.md) | 版本历史、功能更新 |
 
 推荐阅读顺序：
