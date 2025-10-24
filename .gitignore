@@ -75,3 +75,14 @@ backups/
 
 # 用户会话数据库（应该在data/目录）
 user_sessions.db
+
+# 内部文档（不推送到 GitHub）
+GITHUB_UPLOAD_GUIDE.md
+PUSH_TO_GITHUB.md
+PROJECT_READY.md
+PROJECT_ANALYSIS.md
+PROJECT_SUMMARY.md
+INTEGRATION_SUMMARY.md
+SEARCH_INTEGRATION.md
+UPGRADE_GUIDE.md
+COMPARISON.md
