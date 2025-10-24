@@ -73,8 +73,8 @@ check_search_index() {
 import sys
 sys.path.insert(0, '.')
 try:
-    from utils.search_engine import SearchEngine
-    se = SearchEngine()
+    from utils.search_engine import PostSearchEngine
+    se = PostSearchEngine()
     print('搜索索引状态正常')
 except Exception as e:
     print(f'索引需要重建: {e}')
@@ -170,8 +170,8 @@ optimize_index() {
 import sys
 sys.path.insert(0, '.')
 try:
-    from utils.search_engine import SearchEngine
-    se = SearchEngine()
+    from utils.search_engine import PostSearchEngine
+    se = PostSearchEngine()
     se.optimize_index()
     print('索引优化完成')
 except Exception as e:
@@ -198,7 +198,7 @@ sys.path.insert(0, '.')
 try:
     from config.settings import TOKEN
     from utils.database import initialize_database
-    from utils.search_engine import SearchEngine
+    from utils.search_engine import PostSearchEngine
     print('核心模块加载正常')
 except Exception as e:
     print(f'模块加载失败: {e}')

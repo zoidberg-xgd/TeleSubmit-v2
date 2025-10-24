@@ -85,6 +85,51 @@ nano config.ini  # 编辑配置文件
 ./deploy.sh
 ```
 
+**⚡️ 快速启动选项**：
+
+如果您已经有构建好的镜像，想要快速重启服务（跳过漫长的构建过程）：
+
+```bash
+# ⚡️ 快速启动模式（推荐日常使用）
+./deploy.sh --fast
+```
+
+这个选项会：
+- ✅ 跳过 Docker 镜像构建
+- ✅ 直接使用现有镜像启动
+- ✅ 几秒钟内完成部署
+- ⚠️ 需要先有已构建的镜像
+
+**在网络受限环境中使用代理**：
+
+如果您在中国大陆或其他网络受限地区，Docker 构建可能会卡住（拉取镜像、安装依赖等）。您可以使用代理服务器：
+
+```bash
+# 使用本地代理部署（推荐）
+./deploy.sh --proxy http://127.0.0.1:7890
+
+# 使用网络代理
+./deploy.sh --proxy http://192.168.1.100:7890
+
+# 使用代理并重新构建镜像
+./deploy.sh --rebuild --proxy http://127.0.0.1:7890
+
+# 查看所有选项
+./deploy.sh --help
+```
+
+**重要说明**：
+- 脚本会自动将 `localhost`/`127.0.0.1` 转换为 `host.docker.internal`，使容器能访问宿主机代理
+- 确保代理软件允许来自局域网的连接（不只是 localhost）
+- 如遇连接问题，请查看 [故障排查指南](DEPLOY_TROUBLESHOOTING.md#网络问题)
+
+**常见代理软件端口**：
+- Clash: `http://127.0.0.1:7890`
+- V2Ray: `http://127.0.0.1:10809`
+- Shadowsocks: `socks5://127.0.0.1:1080` (需转换为 http)
+
+> 💡 **提示**：确保代理软件已启动并开启"允许局域网连接"选项
+
 **Docker 优势**：
 - 环境隔离，不影响主机
 - 自动重启，服务更稳定
@@ -96,6 +141,7 @@ docker-compose ps              # 查看状态
 docker-compose logs -f         # 查看日志
 docker-compose restart         # 重启容器
 docker-compose down            # 停止并删除容器
+./deploy.sh --rebuild          # 重新构建镜像
 ```
 
 ### 方式四：手动部署（高级用户）
@@ -248,7 +294,7 @@ python3 optimize_database.py
 
 ```bash
 # 初次建立索引（自动进行）
-python3 -c "from utils.search_engine import SearchEngine; SearchEngine().initialize()"
+python3 -c "from utils.search_engine import PostSearchEngine; PostSearchEngine().initialize()"
 ```
 
 ### 重建索引
@@ -535,6 +581,7 @@ crontab -e
 
 ## 相关文档
 
+- [部署故障排查](DEPLOY_TROUBLESHOOTING.md) - 解决部署过程中的常见问题
 - [脚本使用指南](SCRIPTS_GUIDE.md) - 所有管理脚本详细说明
 - [管理员指南](ADMIN_GUIDE.md) - 管理功能和系统维护
 - [索引管理器](INDEX_MANAGER_README.md) - 搜索索引管理
@@ -544,8 +591,8 @@ crontab -e
 ## 获取帮助
 
 如果遇到问题：
-1. 查看日志文件：`logs/bot.log` 和 `logs/error.log`
-2. 检查配置：`python3 check_config.py`
-3. 参考本文档的故障排查章节
+1. **部署阶段问题**：查看 [部署故障排查指南](DEPLOY_TROUBLESHOOTING.md)
+2. 查看日志文件：`logs/bot.log` 和 `logs/error.log`
+3. 检查配置：`python3 check_config.py`
 4. 提交 Issue 到 GitHub 仓库
 
