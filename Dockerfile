@@ -2,18 +2,25 @@
 # 基于 Python 3.11 slim 镜像
 FROM python:3.11-slim
 
+# 代理参数（可选，构建时通过 --build-arg 传入）
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+
 # 设置工作目录
 WORKDIR /app
 
 # 设置环境变量
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    TZ=Asia/Shanghai
+    TZ=Asia/Shanghai \
+    HTTP_PROXY=${HTTP_PROXY} \
+    HTTPS_PROXY=${HTTPS_PROXY}
 
 # 安装系统依赖
 # gcc 和 python3-dev 用于编译 Whoosh 等 Python 包
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
+# 注意：apt-get 不使用代理，直接连接 Debian 源
+RUN HTTP_PROXY="" HTTPS_PROXY="" http_proxy="" https_proxy="" apt-get update && \
+    HTTP_PROXY="" HTTPS_PROXY="" http_proxy="" https_proxy="" apt-get install -y --no-install-recommends \
     tzdata \
     gcc \
     g++ \
@@ -35,6 +42,10 @@ RUN mkdir -p logs data data/search_index
 
 # 设置目录权限
 RUN chmod -R 755 logs data
+
+# 清除代理环境变量（避免影响运行时）
+ENV HTTP_PROXY="" \
+    HTTPS_PROXY=""
 
 # 暴露端口（为未来的 webhook 功能预留）
 # EXPOSE 8443

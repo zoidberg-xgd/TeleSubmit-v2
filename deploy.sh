@@ -13,6 +13,10 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# 代理配置
+USE_PROXY=false
+PROXY_URL=""
+
 # 日志函数
 log_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
@@ -90,12 +94,25 @@ stop_containers() {
 build_and_start() {
     local rebuild=$1
     
+    # 设置构建参数
+    local build_args=""
+    if [ "$USE_PROXY" = true ]; then
+        # 将 localhost/127.0.0.1 转换为 Docker 可访问的地址
+        local docker_proxy_url="$PROXY_URL"
+        if [[ "$PROXY_URL" =~ (localhost|127\.0\.0\.1) ]]; then
+            log_warning "检测到 localhost/127.0.0.1，自动转换为 host.docker.internal"
+            docker_proxy_url=$(echo "$PROXY_URL" | sed -E 's/(localhost|127\.0\.0\.1)/host.docker.internal/g')
+        fi
+        log_info "使用代理: $docker_proxy_url"
+        build_args="--build-arg HTTP_PROXY=$docker_proxy_url --build-arg HTTPS_PROXY=$docker_proxy_url"
+    fi
+    
     if [ "$rebuild" = "--rebuild" ]; then
-        log_info "重新构建 Docker 镜像..."
-        docker-compose build --no-cache
+        log_info "重新构建 Docker 镜像（无缓存）..."
+        docker-compose build --no-cache $build_args
     else
         log_info "构建 Docker 镜像..."
-        docker-compose build
+        docker-compose build $build_args
     fi
     
     log_info "启动容器..."
@@ -111,8 +128,69 @@ show_logs() {
     docker-compose logs -f
 }
 
+# 显示帮助信息
+show_help() {
+    echo ""
+    echo "使用方法: $0 [选项]"
+    echo ""
+    echo "选项："
+    echo "  --fast                 快速启动（跳过构建，直接使用现有镜像）⚡️"
+    echo "  --rebuild              重新构建镜像（无缓存）"
+    echo "  --proxy <URL>          使用代理服务器"
+    echo "  -h, --help             显示帮助信息"
+    echo ""
+    echo "代理说明："
+    echo "  使用 localhost 或 127.0.0.1 会自动转换为 host.docker.internal"
+    echo "  示例: http://127.0.0.1:7890 -> http://host.docker.internal:7890"
+    echo ""
+    echo "示例："
+    echo "  $0                                    # 正常部署"
+    echo "  $0 --fast                             # 快速启动（推荐）⚡️"
+    echo "  $0 --rebuild                          # 重建镜像"
+    echo "  $0 --proxy http://127.0.0.1:7890      # 使用本地代理"
+    echo "  $0 --proxy http://192.168.1.100:7890  # 使用网络代理"
+    echo "  $0 --rebuild --proxy http://127.0.0.1:7890  # 重建+代理"
+    echo ""
+}
+
+# 解析命令行参数
+parse_args() {
+    rebuild_flag=""
+    fast_mode=false
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --fast)
+                fast_mode=true
+                shift
+                ;;
+            --rebuild)
+                rebuild_flag="--rebuild"
+                shift
+                ;;
+            --proxy)
+                USE_PROXY=true
+                PROXY_URL="$2"
+                shift 2
+                ;;
+            -h|--help)
+                show_help
+                exit 0
+                ;;
+            *)
+                log_error "未知选项: $1"
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+}
+
 # 主函数
 main() {
+    # 先解析参数（如果是 --help 会在这里退出）
+    parse_args "$@"
+    
     echo ""
     log_info "=== TeleSubmit v2 Docker 部署 ==="
     echo ""
@@ -129,8 +207,20 @@ main() {
     # 停止现有容器
     stop_containers
     
-    # 构建和启动
-    build_and_start "$1"
+    # 快速模式：直接启动，跳过构建
+    if [ "$fast_mode" = true ]; then
+        log_info "⚡️ 快速启动模式：跳过构建，直接使用现有镜像..."
+        docker-compose up -d --no-build
+        if [ $? -eq 0 ]; then
+            log_success "容器启动成功"
+        else
+            log_error "容器启动失败"
+            exit 1
+        fi
+    else
+        # 构建和启动
+        build_and_start "$rebuild_flag"
+    fi
     
     echo ""
     log_success "部署完成！"
