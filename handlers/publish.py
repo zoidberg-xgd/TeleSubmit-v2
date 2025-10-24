@@ -79,7 +79,8 @@ async def save_published_post(user_id, message_id, data, media_list, doc_list, a
                 related_ids_json = json.dumps(related_ids)
                 logger.info(f"记录{len(related_ids)}个关联消息ID: {related_ids}")
         
-        # 保存到数据库
+        # 保存到数据库并获取 post_id
+        post_id = None
         async with get_db() as conn:
             cursor = await conn.cursor()
             await cursor.execute("""
@@ -103,8 +104,9 @@ async def save_published_post(user_id, message_id, data, media_list, doc_list, a
                 publish_time.timestamp(),
                 related_ids_json
             ))
+            post_id = cursor.lastrowid  # 获取插入的行ID
             await conn.commit()
-            logger.info(f"已保存帖子 {message_id} 到published_posts表（文件名: {filename}）")
+            logger.info(f"已保存帖子 {message_id} (post_id: {post_id}) 到published_posts表（文件名: {filename}）")
         
         # 添加到搜索索引
         try:
@@ -114,6 +116,7 @@ async def save_published_post(user_id, message_id, data, media_list, doc_list, a
             # 将 note 作为 description
             post_doc = PostDocument(
                 message_id=message_id,
+                post_id=post_id,  # 传入数据库ID
                 title=title,
                 description=note,  # 使用note作为描述
                 tags=tags,
@@ -128,7 +131,7 @@ async def save_published_post(user_id, message_id, data, media_list, doc_list, a
             
             # 添加到索引
             search_engine.add_post(post_doc)
-            logger.info(f"已添加帖子 {message_id} 到搜索索引（文件名: {filename}）")
+            logger.info(f"已添加帖子 {message_id} (post_id: {post_id}) 到搜索索引（文件名: {filename}）")
             
         except Exception as e:
             logger.error(f"添加到搜索索引失败: {e}", exc_info=True)

@@ -11,6 +11,25 @@
 
 ### 🚀 新增功能
 
+- **帖子删除功能（OWNER 专用）**:
+  - ✨ 搜索结果中添加删除按钮（仅 OWNER 可见）
+  - ✨ `/myposts` 命令中添加删除按钮（OWNER 专用）
+  - ✨ 批量删除命令 `/delete_posts` 支持：
+    - 单个删除：`/delete_posts 123`
+    - 多个删除：`/delete_posts 123 456 789`
+    - 范围删除：`/delete_posts 100-110`
+    - 混合删除：`/delete_posts 100-110 150 200-205`
+    - 最多一次删除 50 个帖子
+  - 🔒 完善的权限检查机制（仅 OWNER_ID 用户可删除）
+  - 🗑️ 删除操作包括：
+    - 从数据库删除帖子记录
+    - 从搜索索引删除
+    - 删除关联的多媒体消息索引
+  - ⚠️ 不删除频道中的实际消息（需手动删除）
+  - ✅ 删除后标签统计自动更新
+  - ✅ 删除后搜索索引实时更新
+  - 📊 详细的删除统计报告
+
 - **文件名搜索支持**:
   - 搜索引擎新增 `filename` 字段，支持文件名搜索
   - 文档上传时自动提取并保存文件名
@@ -35,6 +54,8 @@
 - `migrate_add_filename.py` - 数据库 schema 迁移工具
 - `migrate_extract_filenames.py` - 文件名提取迁移说明
 - `FILENAME_SEARCH_UPGRADE.md` - 详细升级指南
+- `test_delete_feature.py` - 删除功能测试脚本
+- `DELETE_POST_GUIDE.md` - 帖子删除功能详细指南
 
 ### 🔒 安全改进
 

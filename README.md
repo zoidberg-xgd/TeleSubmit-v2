@@ -159,6 +159,11 @@ docker-compose logs -f           # 容器日志
 | `/blacklist_list` | 查看黑名单 |
 | `/searchuser <ID>` | 查询用户投稿 |
 
+**删除帖子**：仅限 OWNER_ID 用户
+- 删除功能通过回调按钮触发（非命令）
+- 删除操作会同时清理：频道消息、数据库记录、搜索索引
+- 详细说明请查看 [删除帖子指南](DELETE_POST_GUIDE.md)
+
 详细管理功能请查看 [管理员指南](ADMIN_GUIDE.md)。
 
 ## 投稿流程
