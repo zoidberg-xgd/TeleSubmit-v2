@@ -150,8 +150,8 @@ async def search_posts(update: Update, context: CallbackContext):
         message = f"🔍 搜索结果：{time_prefix}{search_desc}\n"
         message += f"找到 {search_result.total_results} 个结果（显示前 {len(search_result.hits)} 个）\n\n"
         
-        # 存储帖子ID用于删除按钮
-        post_ids = []
+        # 存储消息ID用于删除按钮
+        message_ids = []
         
         for idx, hit in enumerate(search_result.hits, 1):
             # 生成帖子链接
@@ -194,9 +194,9 @@ async def search_posts(update: Update, context: CallbackContext):
                 f"   🔗 {post_link}\n\n"
             )
             
-            # 存储post_id供删除功能使用
-            if hasattr(hit, 'post_id'):
-                post_ids.append((idx, hit.post_id))
+            # 存储message_id供删除功能使用
+            if hit.message_id:
+                message_ids.append((idx, hit.message_id))
             
             # 防止消息过长
             if len(message) > 3500:
@@ -204,12 +204,12 @@ async def search_posts(update: Update, context: CallbackContext):
                 break
         
         # 如果是 OWNER，添加删除按钮
-        if is_owner(user_id) and post_ids:
+        if is_owner(user_id) and message_ids:
             keyboard = []
             # 每行最多3个按钮
             row = []
-            for idx, post_id in post_ids[:9]:  # 最多显示9个按钮（3x3）
-                row.append(InlineKeyboardButton(f"🗑️ {idx}", callback_data=f"delete_post_{post_id}"))
+            for idx, msg_id in message_ids[:9]:  # 最多显示9个按钮（3x3）
+                row.append(InlineKeyboardButton(f"🗑️ {idx}", callback_data=f"delete_post_{msg_id}"))
                 if len(row) == 3:
                     keyboard.append(row)
                     row = []
@@ -494,7 +494,7 @@ async def get_my_posts(update: Update, context: CallbackContext):
             keyboard.append(row1)
             
             # 第二行：仅 OWNER 可见的删除按钮
-            if is_owner:
+            if is_owner and post['message_id']:
                 row2 = [
                     InlineKeyboardButton("🗑️ 删除", callback_data=f"delete_post_{post['message_id']}")
                 ]
@@ -719,7 +719,7 @@ async def delete_posts_batch(update: Update, context: CallbackContext):
                 try:
                     # 查询帖子是否存在
                     await cursor.execute(
-                        "SELECT rowid, message_id, related_message_ids FROM published_posts WHERE message_id=?",
+                        "SELECT rowid AS post_id, message_id, related_message_ids FROM published_posts WHERE message_id=?",
                         (msg_id,)
                     )
                     post = await cursor.fetchone()
@@ -748,7 +748,7 @@ async def delete_posts_batch(update: Update, context: CallbackContext):
                         logger.warning(f"从索引删除消息 {msg_id} 失败: {e}")
                     
                     # 从数据库删除
-                    await cursor.execute("DELETE FROM published_posts WHERE rowid=?", (post['rowid'],))
+                    await cursor.execute("DELETE FROM published_posts WHERE rowid=?", (post['post_id'],))
                     success_count += 1
                     logger.info(f"批量删除：已删除帖子 message_id={msg_id}")
                     

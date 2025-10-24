@@ -82,9 +82,16 @@ from handlers.search_handlers import (
     search_by_user, 
     delete_posts_batch
 )
+from handlers.index_handlers import (
+    rebuild_index_command,
+    sync_index_command,
+    index_stats_command,
+    optimize_index_command
+)
 
 # 搜索引擎
 from utils.search_engine import init_search_engine
+from utils.index_manager import auto_rebuild_index_if_needed
 
 # 设置日志
 logger = logging.getLogger(__name__)
@@ -225,6 +232,30 @@ async def main():
         if SEARCH_ENABLED:
             init_search_engine(index_dir=SEARCH_INDEX_DIR, from_scratch=False)
             logger.info(f"搜索引擎初始化完成，索引目录: {SEARCH_INDEX_DIR}")
+            
+            # 自动检查并修复索引
+            logger.info("正在检查搜索索引...")
+            try:
+                result = await auto_rebuild_index_if_needed()
+                if result["action"] == "sync":
+                    sync_result = result["result"]
+                    if sync_result["success"]:
+                        logger.info(f"✅ 索引已自动同步: 添加 {sync_result['added']} 个, 删除 {sync_result['removed']} 个")
+                    else:
+                        logger.warning(f"⚠️ 索引同步部分失败: {sync_result.get('errors', [])}")
+                elif result["action"] == "rebuild":
+                    rebuild_result = result["result"]
+                    if rebuild_result["success"]:
+                        logger.info(f"✅ 索引已自动重建: 成功 {rebuild_result['added']} 个, 失败 {rebuild_result['failed']} 个 (原因: {result.get('reason', '未知')})")
+                    else:
+                        logger.warning(f"⚠️ 索引重建失败: {rebuild_result.get('errors', [])}")
+                elif result["action"] == "none":
+                    logger.info(f"✅ {result['reason']}")
+                else:
+                    logger.warning(f"⚠️ 索引检查失败: {result.get('reason', '未知原因')}")
+            except Exception as idx_err:
+                logger.error(f"索引检查失败: {idx_err}", exc_info=True)
+                logger.warning("将继续运行，但索引可能不准确")
         else:
             logger.info("搜索功能已禁用")
     except Exception as e:
@@ -318,6 +349,12 @@ def setup_application(application):
     application.add_handler(CommandHandler("myposts", get_my_posts))
     application.add_handler(CommandHandler("searchuser", search_by_user))
     application.add_handler(CommandHandler("delete_posts", delete_posts_batch))
+    
+    # 注册索引管理命令处理器（仅管理员）
+    application.add_handler(CommandHandler("rebuild_index", rebuild_index_command))
+    application.add_handler(CommandHandler("sync_index", sync_index_command))
+    application.add_handler(CommandHandler("index_stats", index_stats_command))
+    application.add_handler(CommandHandler("optimize_index", optimize_index_command))
     
     # 注册会话超时检查处理器
     application.add_handler(MessageHandler(filters.ALL, check_conversation_timeout), group=0)
