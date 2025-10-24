@@ -183,6 +183,7 @@ docker-compose logs -f           # 容器日志
 ```
 /search Python              # 搜索关键词
 /search #编程               # 搜索标签
+/search 文件.txt            # 搜索文件名
 ```
 
 高级搜索：
@@ -194,9 +195,21 @@ docker-compose logs -f           # 容器日志
 
 搜索特性：
 - 中文分词优化（jieba）
-- 多字段匹配（标题/描述/标签）
+- 多字段匹配（标题/描述/标签/文件名）
 - 按相关度和热度排序
 - 时间范围筛选
+- 自动索引管理和同步
+
+### 索引管理
+
+系统自动管理搜索索引，支持以下功能：
+
+- **自动重建**: 系统启动时检测索引状态，Schema 不匹配时自动重建
+- **增量同步**: 定期同步数据库和索引，保持数据一致性
+- **索引优化**: 自动优化索引结构，提升搜索性能
+- **手动管理**: 使用 `python3 test_index_manager.py` 测试索引功能
+
+详细信息请查看 [索引管理器文档](INDEX_MANAGER_README.md)
 
 ## 项目结构
 
@@ -213,6 +226,7 @@ TeleSubmit-v2/
 ├── utils/               # 工具模块
 │   ├── database.py
 │   ├── search_engine.py
+│   ├── index_manager.py
 │   ├── heat_calculator.py
 │   ├── blacklist.py
 │   └── file_validator.py
@@ -262,6 +276,7 @@ TeleSubmit-v2/
 | [README](README.md) | 项目介绍、快速开始 |
 | [部署指南](DEPLOYMENT.md) | 详细部署步骤、故障排查 |
 | [管理员指南](ADMIN_GUIDE.md) | 管理功能、系统维护 |
+| [索引管理器](INDEX_MANAGER_README.md) | 搜索索引管理工具 |
 | [更新日志](CHANGELOG.md) | 版本历史、功能更新 |
 
 推荐阅读顺序：
@@ -278,8 +293,9 @@ TeleSubmit-v2/
 3. 检查进程：`ps aux | grep python`
 
 **搜索功能异常？**
-1. 重建搜索索引：`python3 migrate_to_search.py`
-2. 检查索引目录：`ls -la data/search_index/`
+1. 测试索引管理器：`python3 test_index_manager.py`
+2. 重建搜索索引：`python3 migrate_to_search.py`
+3. 检查索引目录：`ls -la data/search_index/`
 
 **热度数据不更新？**
 - 热度每小时自动更新一次

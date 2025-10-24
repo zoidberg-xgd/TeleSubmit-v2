@@ -59,6 +59,21 @@ except (ValueError, TypeError):
     OWNER_ID = None
     logger.warning(f"OWNER_ID 配置无效，无法转换为整数: {_owner_id_str}")
 
+# ADMIN_IDS 管理员ID列表（用于管理命令）
+_admin_ids_str = os.getenv('ADMIN_IDS') or get_config('BOT', 'ADMIN_IDS', fallback='')
+ADMIN_IDS = []
+if _admin_ids_str:
+    try:
+        # 支持逗号分隔的多个ID
+        ADMIN_IDS = [int(id.strip()) for id in _admin_ids_str.split(',') if id.strip()]
+    except (ValueError, TypeError):
+        logger.warning(f"ADMIN_IDS 配置无效: {_admin_ids_str}")
+        ADMIN_IDS = []
+
+# 如果设置了 OWNER_ID 且不在 ADMIN_IDS 中，自动添加
+if OWNER_ID and OWNER_ID not in ADMIN_IDS:
+    ADMIN_IDS.append(OWNER_ID)
+
 SHOW_SUBMITTER = os.getenv('SHOW_SUBMITTER', str(get_config_bool('BOT', 'SHOW_SUBMITTER', True))).lower() in ('true', '1', 'yes')
 NOTIFY_OWNER = os.getenv('NOTIFY_OWNER', str(get_config_bool('BOT', 'NOTIFY_OWNER', True))).lower() in ('true', '1', 'yes')
 BOT_MODE = os.getenv('BOT_MODE') or get_config('BOT', 'BOT_MODE', fallback='MIXED')
@@ -88,6 +103,7 @@ logger.info(f"  - CHANNEL_ID: {CHANNEL_ID}")
 logger.info(f"  - DB_PATH: {DB_PATH}")
 logger.info(f"  - TIMEOUT: {TIMEOUT}")
 logger.info(f"  - OWNER_ID: {OWNER_ID if OWNER_ID else '未设置'}")
+logger.info(f"  - ADMIN_IDS: {ADMIN_IDS if ADMIN_IDS else '未设置'}")
 logger.info(f"  - ALLOWED_FILE_TYPES: {ALLOWED_FILE_TYPES}")
 logger.info(f"  - SEARCH_INDEX_DIR: {SEARCH_INDEX_DIR}")
 logger.info(f"  - SEARCH_ENABLED: {SEARCH_ENABLED}")
