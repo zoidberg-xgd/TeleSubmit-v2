@@ -1,233 +1,667 @@
-# TeleSubmit v2 - Telegram 频道投稿机器人
-
-一个功能完整的 Telegram 频道投稿助手，支持媒体/文档上传、全文搜索、热度统计等功能。
-
 <div align="center">
 
-[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org)
+# 🤖 TeleSubmit v2
+
+**功能强大的 Telegram 频道投稿机器人**
+
+一站式投稿管理解决方案，支持媒体上传、全文搜索、热度统计
+
+[![Python](https://img.shields.io/badge/Python-3.10+-3776ab.svg?logo=python&logoColor=white)](https://www.python.org)
+[![Telegram](https://img.shields.io/badge/Telegram-Bot-26a5e4.svg?logo=telegram&logoColor=white)](https://telegram.org)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ed.svg?logo=docker&logoColor=white)](https://www.docker.com)
+
+[🚀 快速开始](#-快速开始) • [📖 文档](#-完整文档) • [✨ 功能](#-核心功能) • [🐛 反馈](https://github.com/zoidberg-xgd/TeleSubmit-v2/issues)
 
 </div>
 
 ---
 
-## ✨ 主要功能
+## 🌟 项目亮点
 
-### 📝 投稿管理
-- **多种内容类型**：图片、视频、文档、文字
-- **批量上传**：媒体最多50个，文档最多10个
-- **文件类型过滤**：可配置允许的文件类型，适应不同频道需求
-- **标签系统**：必填标签，最多30个，支持标签云展示
-- **可选信息**：链接、标题、说明、剧透标记
-- **会话管理**：自动清理过期会话，可随时取消
+<table>
+<tr>
+<td width="50%">
 
-### 🔍 搜索功能
-- **全文搜索**：基于 Whoosh 引擎，支持中文分词（jieba）
-- **多字段搜索**：标题、描述、标签智能匹配
-- **结果排序**：按相关度和热度排序
-- **时间筛选**：支持查询今日/本周/本月内容
+### 💡 智能投稿系统
+- ✅ 支持图片、视频、文档多种类型
+- ✅ 批量上传（媒体50个、文档10个）
+- ✅ 智能文件类型过滤
+- ✅ 标签系统与标签云可视化
+- ✅ 会话管理，随时可取消
 
-### 📊 统计分析
-- **热度算法**：综合浏览量、转发数、反应数计算
-- **时间衰减**：7天半衰期，保证新鲜度
-- **热门排行**：查看不同时间范围的热门内容
-- **个人统计**：我的投稿列表和详细统计
+</td>
+<td width="50%">
 
-### 👑 管理功能
-- **黑名单系统**：封禁/解封用户
-- **用户查询**：查看指定用户的投稿记录
-- **系统调试**：资源使用、运行状态监控
-- **权限控制**：管理员专属命令
+### 🔍 强大搜索引擎
+- ✅ 基于 Whoosh 的全文搜索
+- ✅ 中文分词（jieba）优化
+- ✅ 多字段智能匹配
+- ✅ 按相关度和热度排序
+- ✅ 时间范围筛选
+
+</td>
+</tr>
+<tr>
+<td>
+
+### 📊 热度统计分析
+- ✅ 智能热度算法（浏览+转发+反应）
+- ✅ 时间衰减机制（7天半衰期）
+- ✅ 热门排行榜
+- ✅ 个人投稿统计
+
+</td>
+<td>
+
+### 🛡️ 完善管理功能
+- ✅ 黑名单系统
+- ✅ 用户投稿查询
+- ✅ 系统状态监控
+- ✅ 权限精细控制
+
+</td>
+</tr>
+</table>
 
 ---
 
 ## 🚀 快速开始
 
-### 前置准备
+### 方式一：一键安装（强烈推荐）
 
-1. **获取 Bot Token**
-   - 在 Telegram 找 [@BotFather](https://t.me/BotFather)
-   - 发送 `/newbot` 创建机器人
-   - 复制获得的 Token
+```bash
+# 克隆项目
+git clone https://github.com/zoidberg-xgd/TeleSubmit-v2.git
+cd TeleSubmit-v2
 
-2. **创建频道**
-   - 创建一个 Telegram 频道
-   - 将机器人添加为管理员，给予「发布消息」权限
-   - 获取频道 ID（公开频道用 `@频道名`，私有频道用数字 ID）
+# 一键安装并部署
+chmod +x install.sh
+./install.sh
+```
 
-3. **获取您的 User ID**
-   - 在 Telegram 找 [@userinfobot](https://t.me/userinfobot)
-   - 发送任意消息获取您的 User ID
+**安装脚本会自动：**
+- 🔍 检测系统环境
+- 📦 安装必要依赖
+- ⚙️ 引导完成配置
+- 🚀 启动机器人服务
 
-### 部署方式一：Docker（推荐）
+### 方式二：Docker 部署
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/zoidberg-xgd/TeleSubmit.git
-cd TeleSubmit
+git clone https://github.com/zoidberg-xgd/TeleSubmit-v2.git
+cd TeleSubmit-v2
 
-# 2. 配置文件
+# 2. 配置
 cp config.ini.example config.ini
-nano config.ini  # 填入 Token、频道ID、User ID
+nano config.ini  # 填入 Token、频道ID、所有者ID
 
-# 3. 启动
-docker-compose up -d
+# 3. 一键部署
+chmod +x deploy.sh
+./deploy.sh
 
-# 4. 查看日志
+# 查看日志
 docker-compose logs -f
 ```
 
-### 部署方式二：直接运行
+### 方式三：直接运行
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/zoidberg-xgd/TeleSubmit.git
-cd TeleSubmit
+git clone https://github.com/zoidberg-xgd/TeleSubmit-v2.git
+cd TeleSubmit-v2
 
 # 2. 安装依赖
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 
-# 3. 配置文件
+# 3. 配置
 cp config.ini.example config.ini
-nano config.ini  # 填入 Token、频道ID、User ID
+nano config.ini
 
 # 4. 启动
-python main.py
-
-# 或后台运行
-nohup python main.py > logs/bot.log 2>&1 &
+chmod +x start.sh
+./start.sh
 ```
+
+---
+
+## 📋 前置准备
+
+### 1️⃣ 获取 Bot Token
+
+1. 在 Telegram 找 [@BotFather](https://t.me/BotFather)
+2. 发送 `/newbot` 创建机器人
+3. 按提示设置名称，获取 Token
+
+### 2️⃣ 准备频道
+
+1. 创建一个 Telegram 频道
+2. 将机器人添加为管理员
+3. 给予「发布消息」权限
+4. 获取频道 ID：
+   - 公开频道：`@channel_username`
+   - 私有频道：转发频道消息给 [@userinfobot](https://t.me/userinfobot) 获取 ID
+
+### 3️⃣ 获取您的 User ID
+
+1. 在 Telegram 找 [@userinfobot](https://t.me/userinfobot)
+2. 发送任意消息
+3. 获取显示的 User ID 数字
 
 ---
 
 ## ⚙️ 配置说明
 
-编辑 `config.ini` 文件：
+### 最小配置
+
+编辑 `config.ini`，填入以下三个必填项即可：
 
 ```ini
-[BOT]
+[Telegram]
+TOKEN = your_bot_token_here        # 机器人 Token
+CHANNEL_ID = @your_channel         # 频道 ID
+OWNER_ID = 123456789               # 您的 User ID
+```
+
+### 完整配置示例
+
+```ini
+[Telegram]
 # === 必填项 ===
-TOKEN = your_bot_token_here
+TOKEN = 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
 CHANNEL_ID = @your_channel
-OWNER_ID = your_user_id
+OWNER_ID = 123456789
 
 # === 可选项 ===
-# 数据库文件路径
-DB_PATH = data/submissions.db
+ADMIN_IDS = 111111111,222222222    # 管理员ID（逗号分隔）
 
-# 会话超时时间（秒）
-TIMEOUT = 300
+[Bot]
+BOT_MODE = MIXED                    # 模式：MIXED/SUBMISSION_ONLY/SEARCH_ONLY
+SHOW_SUBMITTER = yes               # 是否显示投稿者信息
+ENABLE_NOTIFICATIONS = yes         # 是否启用新投稿通知
+ALLOWED_TAGS = 30                  # 最大标签数量
+SESSION_TIMEOUT = 300              # 会话超时时间（秒）
 
-# 最大允许标签数
-ALLOWED_TAGS = 30
+[Media]
+MEDIA_VALIDATION = strict          # 媒体验证：strict/basic/none
+ALLOWED_FILE_TYPES = *             # 允许的文件类型（* 表示全部）
 
-# 机器人模式：MEDIA(仅图片视频) / DOCUMENT(仅文档) / MIXED(全部)
-BOT_MODE = MIXED
+[Search]
+ENABLE_SEARCH = yes                # 是否启用搜索功能
+MAX_SEARCH_RESULTS = 50            # 最大搜索结果数
+INDEX_DIR = data/search_index      # 搜索索引目录
 
-# 是否在频道显示投稿人信息 (true/false)
-SHOW_SUBMITTER = true
-
-# 是否通知所有者新投稿 (true/false)
-NOTIFY_OWNER = true
-
-# 允许的文件类型（仅对文档模式生效）
-# * = 允许所有类型（默认）
-# 扩展名：.pdf,.zip,.txt
-# MIME类型：application/pdf,application/zip
-# 混合：.pdf,application/zip
-# 通配符：audio/*,video/*
-ALLOWED_FILE_TYPES = *
-
-[SEARCH]
-# 搜索索引目录
-INDEX_DIR = data/search_index
-
-# 是否启用搜索功能
-ENABLED = true
+[Database]
+DB_PATH = data/submissions.db      # 数据库路径
 ```
 
-**配置检查**：
-```bash
-python check_config.py
-```
+### 🎯 文件类型过滤示例
 
-### 📂 文件类型过滤配置
-
-根据频道用途，限制允许上传的文件类型：
+根据频道用途自定义允许的文件类型：
 
 ```ini
-# 小说频道
-ALLOWED_FILE_TYPES = .txt,.epub,.mobi,.pdf,.doc,.docx
+# 📚 小说/电子书频道
+ALLOWED_FILE_TYPES = .txt,.epub,.mobi,.pdf,.azw3
 
-# 游戏频道
+# 🎮 游戏频道
 ALLOWED_FILE_TYPES = .zip,.rar,.7z,.apk,.exe
 
-# 音乐频道
-ALLOWED_FILE_TYPES = .mp3,.flac,.wav,.aac,.m4a
+# 🎵 音乐频道
+ALLOWED_FILE_TYPES = .mp3,.flac,.wav,.aac,.m4a,.ogg
 
-# 视频频道
-ALLOWED_FILE_TYPES = .mp4,.mkv,.avi,.mov
+# 🎬 视频频道
+ALLOWED_FILE_TYPES = .mp4,.mkv,.avi,.mov,.wmv
 
-# 办公文档
+# 📄 办公文档
 ALLOWED_FILE_TYPES = .pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx
 
-# 允许所有类型（默认）
+# 🔓 允许所有类型（默认）
 ALLOWED_FILE_TYPES = *
 ```
 
-**高级配置**：
+**高级配置：**
+
 ```ini
 # 使用 MIME 类型
 ALLOWED_FILE_TYPES = application/pdf,application/zip
 
-# 使用 MIME 通配符（允许所有音频和视频）
+# 使用通配符（所有音频和视频）
 ALLOWED_FILE_TYPES = audio/*,video/*
 
-# 混合配置（扩展名 + MIME类型）
-ALLOWED_FILE_TYPES = .pdf,.zip,application/vnd.android.package-archive
+# 混合使用（扩展名 + MIME 类型）
+ALLOWED_FILE_TYPES = .pdf,.zip,audio/*,video/*
 ```
 
-**用户体验**：
-- ✅ 上传允许的文件 → 正常接收
-- ❌ 上传不允许的文件 → 拒绝并提示用户允许的类型
+### 🔍 配置检查工具
+
+```bash
+# 检查配置是否正确
+python3 check_config.py
+
+# 使用配置向导（交互式）
+python3 setup_wizard.py
+```
 
 ---
 
 ## 📱 使用命令
 
-### 基础命令（所有用户）
+### 👥 用户命令
 
-| 命令 | 说明 |
-|------|------|
-| `/start` | 开始使用机器人 |
-| `/submit` | 开始新投稿 |
-| `/cancel` | 取消当前投稿 |
-| `/help` | 查看帮助信息 |
-| `/settings` | 查看机器人设置 |
+<table>
+<tr>
+<th width="30%">命令</th>
+<th width="70%">说明</th>
+</tr>
+<tr>
+<td><code>/start</code></td>
+<td>🚀 开始使用机器人，显示欢迎信息</td>
+</tr>
+<tr>
+<td><code>/submit</code></td>
+<td>📝 开始新投稿流程</td>
+</tr>
+<tr>
+<td><code>/cancel</code></td>
+<td>❌ 取消当前投稿</td>
+</tr>
+<tr>
+<td><code>/help</code></td>
+<td>❓ 查看帮助信息和命令列表</td>
+</tr>
+<tr>
+<td><code>/settings</code></td>
+<td>⚙️ 查看机器人设置和功能</td>
+</tr>
+</table>
 
-### 统计与搜索
+### 🔍 搜索与统计
 
-| 命令 | 说明 | 示例 |
-|------|------|------|
-| `/hot [数量] [时间]` | 查看热门帖子 | `/hot 20 week` |
-| `/search <关键词>` | 搜索帖子 | `/search Python` |
-| `/tags [数量]` | 查看标签云 | `/tags 50` |
-| `/mystats` | 我的投稿统计 | `/mystats` |
-| `/myposts [数量]` | 我的投稿列表 | `/myposts 20` |
+<table>
+<tr>
+<th width="30%">命令</th>
+<th width="40%">说明</th>
+<th width="30%">示例</th>
+</tr>
+<tr>
+<td><code>/search &lt;关键词&gt;</code></td>
+<td>搜索帖子内容</td>
+<td><code>/search Python教程</code></td>
+</tr>
+<tr>
+<td><code>/hot [数量] [时间]</code></td>
+<td>查看热门帖子排行</td>
+<td><code>/hot 20 week</code></td>
+</tr>
+<tr>
+<td><code>/tags [数量]</code></td>
+<td>查看标签云</td>
+<td><code>/tags 50</code></td>
+</tr>
+<tr>
+<td><code>/mystats</code></td>
+<td>查看我的投稿统计</td>
+<td><code>/mystats</code></td>
+</tr>
+<tr>
+<td><code>/myposts [数量]</code></td>
+<td>查看我的投稿列表</td>
+<td><code>/myposts 20</code></td>
+</tr>
+</table>
 
-**时间范围**：`day`（今日）、`week`（本周）、`month`（本月）
+**时间范围参数：**
+- `day` - 今日
+- `week` - 本周
+- `month` - 本月
+- `all` - 全部（默认）
 
-### 管理员命令（仅所有者）
+### 👑 管理员命令
 
-| 命令 | 说明 |
-|------|------|
-| `/debug` | 查看系统调试信息 |
-| `/blacklist_add <ID> [原因]` | 添加黑名单 |
-| `/blacklist_remove <ID>` | 移除黑名单 |
-| `/blacklist_list` | 查看黑名单列表 |
-| `/searchuser <ID>` | 查询用户投稿 |
+<table>
+<tr>
+<th width="40%">命令</th>
+<th width="60%">说明</th>
+</tr>
+<tr>
+<td><code>/debug</code></td>
+<td>📊 查看系统状态和资源使用情况</td>
+</tr>
+<tr>
+<td><code>/blacklist_add &lt;ID&gt; [原因]</code></td>
+<td>🚫 将用户加入黑名单</td>
+</tr>
+<tr>
+<td><code>/blacklist_remove &lt;ID&gt;</code></td>
+<td>✅ 将用户移出黑名单</td>
+</tr>
+<tr>
+<td><code>/blacklist_list</code></td>
+<td>📋 查看黑名单列表</td>
+</tr>
+<tr>
+<td><code>/searchuser &lt;ID&gt;</code></td>
+<td>🔍 查询指定用户的投稿记录</td>
+</tr>
+</table>
 
-详细管理说明请查看 [ADMIN_GUIDE.md](ADMIN_GUIDE.md)
+> 📘 详细管理功能请查看 [管理员指南](ADMIN_GUIDE.md)
+
+---
+
+## ✨ 核心功能
+
+### 📝 投稿流程
+
+```
+1️⃣  发送 /submit
+2️⃣  选择投稿类型（媒体/文档/混合）
+3️⃣  上传文件
+     • 媒体：最多 50 个（图片/视频）
+     • 文档：最多 10 个
+4️⃣  发送 /done_media 或 /done_doc 完成上传
+5️⃣  输入标签（空格或逗号分隔，最多30个）
+6️⃣  输入可选信息：
+     • 链接（支持多个，用空格分隔）
+     • 标题
+     • 说明
+     • 剧透标记
+7️⃣  预览并确认
+8️⃣  发布到频道 ✅
+```
+
+### 🔍 搜索功能
+
+**基础搜索：**
+```
+/search Python              # 搜索关键词
+/search #编程               # 搜索标签
+```
+
+**高级搜索：**
+```
+/search Python -t week      # 限定时间范围
+/search 教程 -n 20          # 限定结果数量
+/search #Python -t month -n 15  # 组合使用
+```
+
+**搜索引擎特性：**
+- 🔤 中文分词优化（jieba）
+- 🎯 多字段智能匹配（标题/描述/标签）
+- 📊 按相关度和热度排序
+- ⏰ 时间范围筛选
+- 💡 高亮显示匹配结果
+
+### 📊 热度算法
+
+**计算公式：**
+
+```
+热度分数 = (浏览数 × 0.3 + 转发数 × 10 × 0.4 + 反应数 × 5 × 0.3) × 时间衰减因子
+```
+
+**时间衰减机制：**
+- 📉 半衰期：7 天
+- 🧮 公式：`2^(-天数/7)`
+- 🎯 效果：新内容权重更高，旧内容逐渐降低
+
+**更新策略：**
+- ⏰ 每小时自动更新最近 30 天的帖子
+- ⚡ 平衡准确性与 API 请求频率
+
+### 🏷️ 标签系统
+
+**功能特性：**
+- ✅ 必填项，至少 1 个标签
+- ✅ 最多 30 个标签（可配置）
+- ✅ 自动去重和格式化
+- ✅ 支持 `#标签` 和 `标签` 两种格式
+- ✅ 标签云可视化展示（按使用频率）
+
+**标签云示例：**
+```
+/tags 50
+
+📊 标签云（Top 50）
+
+#Python (125)  #编程 (98)  #教程 (87)
+#JavaScript (76)  #Web开发 (65)  ...
+```
+
+---
+
+## 🐳 Docker 部署
+
+### 使用 Docker Compose
+
+```bash
+# 启动服务
+docker-compose up -d
+
+# 查看日志
+docker-compose logs -f
+
+# 查看状态
+docker-compose ps
+
+# 重启服务
+docker-compose restart
+
+# 停止服务
+docker-compose stop
+
+# 完全删除（保留数据）
+docker-compose down
+
+# 完全删除（删除数据卷）
+docker-compose down -v
+
+# 重新构建
+docker-compose build --no-cache
+docker-compose up -d
+```
+
+### 使用 Makefile
+
+```bash
+# 查看所有命令
+make help
+
+# 一键部署
+make deploy
+
+# 查看日志
+make logs
+
+# 重启
+make restart
+
+# 备份数据
+make backup
+
+# 进入容器
+make shell
+
+# 运行迁移
+make migrate
+
+# 更新到最新版本
+make update
+```
+
+### 数据持久化
+
+Docker 已自动挂载以下目录：
+- `./config.ini` → `/app/config.ini`
+- `./data/` → `/app/data/`
+- `./logs/` → `/app/logs/`
+
+容器重启不会丢失数据。
+
+---
+
+## 🔄 更新和维护
+
+### 更新到最新版本
+
+**自动更新（推荐）：**
+
+```bash
+chmod +x update.sh
+./update.sh
+```
+
+更新脚本会自动：
+- 📦 备份当前数据和配置
+- ⬇️ 拉取最新代码
+- 🔨 重新构建并重启服务
+- 📊 显示更新日志
+
+**手动更新：**
+
+```bash
+# 备份数据
+cp -r data data_backup_$(date +%Y%m%d)
+
+# 拉取代码
+git pull
+
+# Docker 部署
+docker-compose down
+docker-compose build --no-cache
+docker-compose up -d
+
+# 直接运行
+pip3 install -r requirements.txt --upgrade
+# 重启应用
+```
+
+### 数据备份
+
+```bash
+# 使用 Makefile
+make backup
+
+# 手动备份
+tar -czf backup_$(date +%Y%m%d_%H%M%S).tar.gz \
+    config.ini data/ logs/
+```
+
+### 卸载
+
+```bash
+# 使用卸载脚本
+chmod +x uninstall.sh
+./uninstall.sh
+
+# 手动卸载 Docker
+docker-compose down -v
+docker rmi telesubmit-v2
+
+# 手动卸载 Systemd
+sudo systemctl stop telesubmit
+sudo systemctl disable telesubmit
+sudo rm /etc/systemd/system/telesubmit.service
+```
+
+---
+
+## 📖 完整文档
+
+<table>
+<tr>
+<th width="30%">文档</th>
+<th width="50%">说明</th>
+<th width="20%">适用人群</th>
+</tr>
+<tr>
+<td>📘 <a href="README.md">README</a></td>
+<td>项目介绍、快速开始、核心功能</td>
+<td>⭐⭐⭐⭐⭐ 所有用户</td>
+</tr>
+<tr>
+<td>🚀 <a href="DEPLOYMENT.md">部署指南</a></td>
+<td>详细部署步骤、多种部署方式、故障排查</td>
+<td>⭐⭐⭐⭐ 部署人员</td>
+</tr>
+<tr>
+<td>👑 <a href="ADMIN_GUIDE.md">管理员指南</a></td>
+<td>管理功能、系统维护、数据管理</td>
+<td>⭐⭐⭐ 管理员</td>
+</tr>
+<tr>
+<td>📝 <a href="CHANGELOG.md">更新日志</a></td>
+<td>版本历史、功能更新、问题修复</td>
+<td>⭐⭐ 开发者</td>
+</tr>
+</table>
+
+### 📚 推荐阅读顺序
+
+1. **首次部署**：README → 部署指南
+2. **日常使用**：README（命令部分）
+3. **管理维护**：管理员指南
+4. **深入了解**：`docs/archive/` 技术文档
+
+---
+
+## 🛠️ 故障排查
+
+### ❌ 机器人无响应
+
+**1. 检查配置**
+```bash
+python3 check_config.py
+```
+
+**2. 查看日志**
+```bash
+# Docker
+docker-compose logs -f
+
+# Systemd
+sudo journalctl -u telesubmit -n 50
+
+# 直接运行
+tail -f logs/error.log
+```
+
+**3. 验证网络**
+```bash
+ping api.telegram.org
+curl https://api.telegram.org/bot<YOUR_TOKEN>/getMe
+```
+
+### ❌ 无法发送到频道
+
+检查清单：
+- ✅ 机器人是频道管理员
+- ✅ 有「发布消息」权限
+- ✅ 频道 ID 格式正确
+  - 公开频道：`@channel_username`
+  - 私有频道：`-100xxxxxxxxxx`
+
+### ❌ 搜索功能不工作
+
+重建搜索索引：
+```bash
+# 直接运行
+python3 migrate_to_search.py
+
+# Docker
+docker exec telesubmit-v2 python migrate_to_search.py
+```
+
+### ❌ 权限错误
+
+修复文件权限：
+```bash
+chmod -R 755 data/ logs/
+chown -R $USER:$USER data/ logs/
+```
+
+> 📘 更多问题请查看 [部署指南](DEPLOYMENT.md) 故障排查章节
 
 ---
 
@@ -235,252 +669,249 @@ ALLOWED_FILE_TYPES = .pdf,.zip,application/vnd.android.package-archive
 
 ```
 TeleSubmit-v2/
-├── config/                  # 配置管理
-│   └── settings.py
-├── handlers/                # 消息处理器
-│   ├── command_handlers.py # 命令处理
-│   ├── submission_handlers.py # 投稿流程
-│   ├── admin_handlers.py   # 管理功能
-│   ├── search_handlers.py  # 搜索功能
-│   ├── callback_handlers.py # 回调处理
-│   └── publish.py          # 发布处理
-├── utils/                   # 工具函数
-│   ├── database.py         # 数据库操作
-│   ├── search_engine.py    # 全文搜索引擎
-│   ├── helpers.py          # 辅助函数
-│   └── blacklist.py        # 黑名单管理
-├── ui/                      # 用户界面
-│   ├── keyboards.py        # 键盘布局
-│   └── messages.py         # 消息模板
-├── data/                    # 数据目录
-│   ├── submissions.db      # SQLite 数据库
-│   └── search_index/       # 搜索索引
-├── logs/                    # 日志目录
-├── main.py                  # 主程序
-├── check_config.py          # 配置检查工具
-├── migrate_to_search.py     # 搜索迁移工具
-├── config.ini.example       # 配置示例
-├── docker-compose.yml       # Docker 配置
-├── Dockerfile               # Docker 镜像
-└── requirements.txt         # Python 依赖
+├── 📁 config/                   # 配置管理
+│   └── settings.py             # 配置加载器
+├── 📁 handlers/                 # 消息处理器
+│   ├── command_handlers.py     # 基础命令
+│   ├── submit_handlers.py      # 投稿流程
+│   ├── search_handlers.py      # 搜索功能
+│   ├── stats_handlers.py       # 统计功能
+│   ├── callback_handlers.py    # 回调处理
+│   └── publish.py              # 发布逻辑
+├── 📁 utils/                    # 工具模块
+│   ├── database.py             # 数据库操作
+│   ├── search_engine.py        # 搜索引擎
+│   ├── heat_calculator.py      # 热度计算
+│   ├── blacklist.py            # 黑名单管理
+│   └── file_validator.py       # 文件验证
+├── 📁 ui/                       # 用户界面
+│   ├── keyboards.py            # 键盘布局
+│   └── messages.py             # 消息模板
+├── 📁 data/                     # 数据目录
+│   ├── submissions.db          # 主数据库
+│   ├── user_sessions.db        # 会话数据
+│   └── search_index/           # 搜索索引
+├── 📁 logs/                     # 日志目录
+├── 📄 main.py                   # 主程序入口
+├── 🔧 setup_wizard.py           # 配置向导
+├── 🔧 check_config.py           # 配置检查
+├── 🔧 migrate_to_search.py      # 搜索迁移
+├── 🚀 install.sh                # 一键安装脚本
+├── 🚀 deploy.sh                 # Docker 部署脚本
+├── 🚀 update.sh                 # 更新脚本
+├── 🚀 start.sh                  # 启动脚本
+├── 📋 requirements.txt          # Python 依赖
+├── 🐳 Dockerfile                # Docker 镜像
+├── 🐳 docker-compose.yml        # Docker Compose 配置
+└── 📖 README.md                 # 项目文档
 ```
 
 ---
 
-## 🔧 热度算法
+## 🔐 安全建议
 
-热度分数 = `(浏览数 × 0.3 + 转发数 × 10 × 0.4 + 反应数 × 5 × 0.3) × 时间衰减因子`
-
-**时间衰减**：
-- 半衰期：7天
-- 公式：`2^(-天数/7)`
-- 效果：新帖子权重更高，旧帖子逐渐降低
-
-**更新机制**：
-- 自动每小时更新最近30天的帖子统计
-- 平衡数据准确性和 API 请求频率
-
----
-
-## 🐳 Docker 管理
-
-### 常用命令
-
-```bash
-# 启动
-docker-compose up -d
-
-# 查看日志
-docker-compose logs -f
-
-# 重启
-docker-compose restart
-
-# 停止
-docker-compose stop
-
-# 完全停止并删除
-docker-compose down
-
-# 重新构建
-docker-compose up -d --build
-```
-
-### 数据持久化
-
-Docker 配置已自动挂载以下目录：
-- `./data` - 数据库和搜索索引
-- `./logs` - 日志文件
-
-数据会保存在宿主机，容器重启不会丢失。
-
----
-
-## 🔍 搜索迁移
-
-如果升级到 v2 版本，需要迁移现有数据到搜索索引：
-
-```bash
-# 直接运行
-python migrate_to_search.py
-
-# Docker 环境
-docker-compose exec telesubmit-v2 python migrate_to_search.py
-```
-
-迁移工具会自动：
-- 扫描数据库中的所有已发布帖子
-- 建立全文搜索索引
-- 支持增量更新
-
----
-
-## 📖 文档导航
-
-### 核心文档
-
-| 文档 | 说明 | 适用人群 |
-|------|------|----------|
-| **[README.md](README.md)** | 项目介绍、快速开始、功能说明 | 所有用户 ⭐⭐⭐⭐⭐ |
-| **[DEPLOY_GUIDE.md](DEPLOY_GUIDE.md)** | 详细部署步骤、故障排查 | 部署人员 ⭐⭐⭐⭐ |
-| **[ADMIN_GUIDE.md](ADMIN_GUIDE.md)** | 管理员功能、系统维护 | 管理员 ⭐⭐⭐ |
-| **[CHANGELOG.md](CHANGELOG.md)** | 版本历史、更新记录 | 开发者 ⭐⭐ |
-
-### 推荐阅读顺序
-
-1. **首次部署**：README.md → DEPLOY_GUIDE.md
-2. **日常使用**：README.md（命令部分）
-3. **管理维护**：ADMIN_GUIDE.md
-4. **技术细节**：`docs/archive/` 目录下的技术文档
-
----
-
-## 🛠️ 故障排查
-
-### 机器人无响应
-
-1. **检查配置**
+1. **保护配置文件**
    ```bash
-   python check_config.py
+   chmod 600 config.ini
    ```
 
-2. **查看日志**
+2. **使用环境变量**（可选）
    ```bash
-   # Docker
-   docker-compose logs -f
-   
-   # 直接运行
-   tail -f logs/bot.log
+   export TOKEN="your_bot_token"
+   export CHANNEL_ID="@your_channel"
+   export OWNER_ID="123456789"
    ```
 
-3. **验证网络**
-   确保能访问 `api.telegram.org`
+3. **定期备份数据**
+   ```bash
+   # 添加到 crontab
+   0 2 * * * cd /path/to/TeleSubmit-v2 && make backup
+   ```
 
-### 无法发送到频道
+4. **更新依赖包**
+   ```bash
+   pip3 install -r requirements.txt --upgrade
+   ```
 
-- ✅ 确认机器人是频道管理员
-- ✅ 确认有「发布消息」权限
-- ✅ 确认频道 ID 格式正确
-
-### 搜索功能不工作
-
-```bash
-# 重建搜索索引
-python migrate_to_search.py
-```
-
-更多问题请查看 [DEPLOY_GUIDE.md](DEPLOY_GUIDE.md) 的故障排查章节。
+5. **监控日志**
+   ```bash
+   # 设置日志轮转
+   logrotate /etc/logrotate.d/telesubmit
+   ```
 
 ---
 
-## 📋 依赖项
+## 📊 系统要求
 
+### 最低配置
+
+| 项目 | 要求 |
+|------|------|
+| **操作系统** | Linux / macOS / Windows (WSL2) |
+| **Python** | >= 3.10 |
+| **内存** | >= 512 MB |
+| **磁盘** | >= 1 GB |
+| **网络** | 可访问 api.telegram.org |
+
+### 推荐配置
+
+| 项目 | 推荐 |
+|------|------|
+| **操作系统** | Ubuntu 22.04 LTS / Debian 12 |
+| **Python** | 3.11+ |
+| **内存** | >= 1 GB |
+| **磁盘** | >= 5 GB |
+| **CPU** | >= 2 核 |
+
+---
+
+## 📦 依赖项
+
+```txt
+python-telegram-bot >= 20.0    # Telegram Bot API 框架
+whoosh >= 2.7.4                # 全文搜索引擎
+jieba >= 0.42.1                # 中文分词
+Pillow >= 10.0.0               # 图像处理
+psutil >= 5.9.0                # 系统监控
 ```
-python-telegram-bot >= 21.0  # Telegram Bot API
-aiosqlite >= 0.17.0          # 异步 SQLite
-whoosh >= 2.7.4              # 全文搜索引擎
-jieba >= 0.42.1              # 中文分词
-psutil >= 5.9.0              # 系统信息
-configparser >= 6.0.0        # 配置解析
-python-dotenv >= 1.0.0       # 环境变量
-```
+
+---
+
+## 🤝 贡献
+
+欢迎贡献代码、报告问题或提出建议！
+
+1. Fork 本项目
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 开启 Pull Request
 
 ---
 
 ## 📄 许可证
 
-MIT License - 详见 [LICENSE](LICENSE) 文件
+本项目采用 [MIT 许可证](LICENSE)。
+
+您可以自由地：
+- ✅ 使用
+- ✅ 复制
+- ✅ 修改
+- ✅ 合并
+- ✅ 发布
+- ✅ 分发
+- ✅ 再许可
+- ✅ 出售
 
 ---
 
-## 💬 支持
+## 💬 获取帮助
 
-- **问题反馈**：[GitHub Issues](https://github.com/zoidberg-xgd/TeleSubmit/issues)
-- **开发者**：[@zoidberg-xgd](https://github.com/zoidberg-xgd)
-- **项目地址**：https://github.com/zoidberg-xgd/TeleSubmit
+<table>
+<tr>
+<td width="25%">
+
+### 🐛 问题反馈
+[GitHub Issues](https://github.com/zoidberg-xgd/TeleSubmit-v2/issues)
+
+</td>
+<td width="25%">
+
+### 💡 功能建议
+[GitHub Discussions](https://github.com/zoidberg-xgd/TeleSubmit-v2/discussions)
+
+</td>
+<td width="25%">
+
+### 👨‍💻 开发者
+[@zoidberg-xgd](https://github.com/zoidberg-xgd)
+
+</td>
+<td width="25%">
+
+### 📖 文档
+[完整文档](https://github.com/zoidberg-xgd/TeleSubmit-v2)
+
+</td>
+</tr>
+</table>
 
 ---
 
 ## 🎯 使用示例
 
-### 投稿流程
+### 📝 投稿示例
 
 ```
-1. 用户发送 /submit
-2. 选择投稿类型（媒体/文档）
-3. 上传文件
-4. 发送 /done_media 或 /done_doc
-5. 输入标签（用空格或逗号分隔）
-6. 输入链接（可选，/skip_optional 跳过）
-7. 输入标题（可选）
-8. 输入说明（可选）
-9. 选择是否设置剧透
-10. 确认并发布
+👤 用户: /submit
+🤖 机器人: 请选择投稿类型...
+
+👤 用户: [选择"媒体投稿"]
+🤖 机器人: 请上传媒体文件...
+
+👤 用户: [上传3张图片]
+👤 用户: /done_media
+
+🤖 机器人: 请输入标签...
+👤 用户: Python 编程 教程
+
+🤖 机器人: 请输入链接（可选）...
+👤 用户: https://example.com
+
+🤖 机器人: 预览如下，确认发布？
+👤 用户: [点击"确认发布"]
+
+✅ 发布成功！
 ```
 
-### 搜索示例
+### 🔍 搜索示例
 
-```
-# 基础搜索
+```bash
+# 搜索 Python 相关内容
 /search Python
 
-# 搜索标签
-/search #编程
+# 搜索本周的 Python 教程
+/search Python教程 -t week
 
-# 限定时间范围
-/search 教程 -t week
-
-# 限定结果数量
-/search Python -n 20
-
-# 组合使用
-/search #Python -t month -n 15
+# 搜索最近 20 个编程相关内容
+/search 编程 -n 20
 ```
 
-### 热门榜单
+### 📊 统计示例
 
-```
-# 默认：前10个热门
-/hot
-
-# 查看前20个
-/hot 20
-
-# 查看本周前10个
+```bash
+# 查看本周热门 Top 10
 /hot 10 week
 
-# 查看本月前50个
-/hot 50 month
+# 查看我的投稿统计
+/mystats
+
+# 查看标签云 Top 30
+/tags 30
 ```
+
+---
+
+## 🌟 致谢
+
+感谢以下开源项目：
+
+- [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot) - Telegram Bot API 框架
+- [Whoosh](https://github.com/mchaput/whoosh) - 纯 Python 搜索引擎
+- [jieba](https://github.com/fxsjy/jieba) - 中文分词库
 
 ---
 
 <div align="center">
 
-**🎉 开始使用吧！**
+### 🎉 开始使用吧！
 
-如有问题，请先运行 `python check_config.py` 诊断配置。
+**如遇问题，请先运行 `python3 check_config.py` 诊断配置**
 
 Made with ❤️ by [zoidberg-xgd](https://github.com/zoidberg-xgd)
+
+⭐ 如果这个项目对您有帮助，请给个 Star！
+
+[⬆ 回到顶部](#-telesubmit-v2)
 
 </div>
