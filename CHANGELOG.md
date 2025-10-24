@@ -11,6 +11,24 @@
 
 ### 🚀 新增功能
 
+- **Railway 云端部署支持** 🌐:
+  - ✨ 添加完整的 Railway.app 部署配置
+  - 📄 创建 `railway.json` 配置文件
+  - 📄 创建 `Procfile` 启动文件
+  - 📄 创建 `runtime.txt` 指定 Python 3.11
+  - 📄 创建 `.dockerignore` 优化构建
+  - 📚 详细教程：`DEPLOY_RAILWAY.md` Railway 部署指南
+  - 💡 支持免费部署（512MB RAM，500 小时/月）
+  - 💾 支持数据持久化（SQLite + 搜索索引）
+  - 🔧 环境变量配置说明
+  - 📊 成本估算和优化建议
+
+- **内存占用分析工具**:
+  - 📊 创建内存分析工具 (`analyze_memory.py`)
+  - 📈 自动分析各组件内存占用
+  - 💡 提供部署建议和优化方案
+  - 📚 详细文档：`MEMORY_USAGE.md` 内存占用说明
+
 - **索引管理器 (Index Manager)**:
   - ✨ 创建完整的索引管理工具 (`utils/index_manager.py`)
   - 🔄 索引重建功能：支持完全重建搜索索引

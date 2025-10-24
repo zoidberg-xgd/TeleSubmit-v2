@@ -126,6 +126,10 @@ DEPLOYMENT_*.md
 *_说明.md
 .gitignore_说明.md
 
+# 内存分析文档（临时分析文档）
+MEMORY_*.md
+analyze_memory.py
+
 # 其他临时文件
 *.pyc
 .pytest_cache/
