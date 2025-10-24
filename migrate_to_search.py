@@ -58,11 +58,18 @@ async def migrate_posts(clear_index: bool = False):
         for post in posts:
             try:
                 # 创建搜索文档
+                # 安全获取 filename 字段（可能不存在于旧数据）
+                try:
+                    filename = post['filename'] or ''
+                except (KeyError, IndexError):
+                    filename = ''
+                
                 post_doc = PostDocument(
                     message_id=post['message_id'],
                     title=post['title'] or '',
                     description=post['note'] or '',  # 使用 note 作为描述
                     tags=post['tags'] or '',
+                    filename=filename,  # 文件名字段
                     link=post['link'] or '',
                     user_id=post['user_id'],
                     username=post['username'] or f"user{post['user_id']}",
