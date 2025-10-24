@@ -124,38 +124,9 @@ chmod +x start.sh
 ./start.sh
 ```
 
----
+## ⚙️ 基本配置
 
-## 📋 前置准备
-
-### 1️⃣ 获取 Bot Token
-
-1. 在 Telegram 找 [@BotFather](https://t.me/BotFather)
-2. 发送 `/newbot` 创建机器人
-3. 按提示设置名称，获取 Token
-
-### 2️⃣ 准备频道
-
-1. 创建一个 Telegram 频道
-2. 将机器人添加为管理员
-3. 给予「发布消息」权限
-4. 获取频道 ID：
-   - 公开频道：`@channel_username`
-   - 私有频道：转发频道消息给 [@userinfobot](https://t.me/userinfobot) 获取 ID
-
-### 3️⃣ 获取您的 User ID
-
-1. 在 Telegram 找 [@userinfobot](https://t.me/userinfobot)
-2. 发送任意消息
-3. 获取显示的 User ID 数字
-
----
-
-## ⚙️ 配置说明
-
-### 最小配置
-
-编辑 `config.ini`，填入以下三个必填项即可：
+编辑 `config.ini`，填入三个必填项：
 
 ```ini
 [Telegram]
@@ -164,84 +135,7 @@ CHANNEL_ID = @your_channel         # 频道 ID
 OWNER_ID = 123456789               # 您的 User ID
 ```
 
-### 完整配置示例
-
-```ini
-[Telegram]
-# === 必填项 ===
-TOKEN = 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
-CHANNEL_ID = @your_channel
-OWNER_ID = 123456789
-
-# === 可选项 ===
-ADMIN_IDS = 111111111,222222222    # 管理员ID（逗号分隔）
-
-[Bot]
-BOT_MODE = MIXED                    # 模式：MIXED/SUBMISSION_ONLY/SEARCH_ONLY
-SHOW_SUBMITTER = yes               # 是否显示投稿者信息
-ENABLE_NOTIFICATIONS = yes         # 是否启用新投稿通知
-ALLOWED_TAGS = 30                  # 最大标签数量
-SESSION_TIMEOUT = 300              # 会话超时时间（秒）
-
-[Media]
-MEDIA_VALIDATION = strict          # 媒体验证：strict/basic/none
-ALLOWED_FILE_TYPES = *             # 允许的文件类型（* 表示全部）
-
-[Search]
-ENABLE_SEARCH = yes                # 是否启用搜索功能
-MAX_SEARCH_RESULTS = 50            # 最大搜索结果数
-INDEX_DIR = data/search_index      # 搜索索引目录
-
-[Database]
-DB_PATH = data/submissions.db      # 数据库路径
-```
-
-### 🎯 文件类型过滤示例
-
-根据频道用途自定义允许的文件类型：
-
-```ini
-# 📚 小说/电子书频道
-ALLOWED_FILE_TYPES = .txt,.epub,.mobi,.pdf,.azw3
-
-# 🎮 游戏频道
-ALLOWED_FILE_TYPES = .zip,.rar,.7z,.apk,.exe
-
-# 🎵 音乐频道
-ALLOWED_FILE_TYPES = .mp3,.flac,.wav,.aac,.m4a,.ogg
-
-# 🎬 视频频道
-ALLOWED_FILE_TYPES = .mp4,.mkv,.avi,.mov,.wmv
-
-# 📄 办公文档
-ALLOWED_FILE_TYPES = .pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx
-
-# 🔓 允许所有类型（默认）
-ALLOWED_FILE_TYPES = *
-```
-
-**高级配置：**
-
-```ini
-# 使用 MIME 类型
-ALLOWED_FILE_TYPES = application/pdf,application/zip
-
-# 使用通配符（所有音频和视频）
-ALLOWED_FILE_TYPES = audio/*,video/*
-
-# 混合使用（扩展名 + MIME 类型）
-ALLOWED_FILE_TYPES = .pdf,.zip,audio/*,video/*
-```
-
-### 🔍 配置检查工具
-
-```bash
-# 检查配置是否正确
-python3 check_config.py
-
-# 使用配置向导（交互式）
-python3 setup_wizard.py
-```
+> 📖 **详细配置选项**请查看 [部署指南](DEPLOYMENT.md#配置说明)
 
 ---
 
@@ -431,142 +325,6 @@ python3 setup_wizard.py
 
 ---
 
-## 🐳 Docker 部署
-
-### 使用 Docker Compose
-
-```bash
-# 启动服务
-docker-compose up -d
-
-# 查看日志
-docker-compose logs -f
-
-# 查看状态
-docker-compose ps
-
-# 重启服务
-docker-compose restart
-
-# 停止服务
-docker-compose stop
-
-# 完全删除（保留数据）
-docker-compose down
-
-# 完全删除（删除数据卷）
-docker-compose down -v
-
-# 重新构建
-docker-compose build --no-cache
-docker-compose up -d
-```
-
-### 使用 Makefile
-
-```bash
-# 查看所有命令
-make help
-
-# 一键部署
-make deploy
-
-# 查看日志
-make logs
-
-# 重启
-make restart
-
-# 备份数据
-make backup
-
-# 进入容器
-make shell
-
-# 运行迁移
-make migrate
-
-# 更新到最新版本
-make update
-```
-
-### 数据持久化
-
-Docker 已自动挂载以下目录：
-- `./config.ini` → `/app/config.ini`
-- `./data/` → `/app/data/`
-- `./logs/` → `/app/logs/`
-
-容器重启不会丢失数据。
-
----
-
-## 🔄 更新和维护
-
-### 更新到最新版本
-
-**自动更新（推荐）：**
-
-```bash
-chmod +x update.sh
-./update.sh
-```
-
-更新脚本会自动：
-- 📦 备份当前数据和配置
-- ⬇️ 拉取最新代码
-- 🔨 重新构建并重启服务
-- 📊 显示更新日志
-
-**手动更新：**
-
-```bash
-# 备份数据
-cp -r data data_backup_$(date +%Y%m%d)
-
-# 拉取代码
-git pull
-
-# Docker 部署
-docker-compose down
-docker-compose build --no-cache
-docker-compose up -d
-
-# 直接运行
-pip3 install -r requirements.txt --upgrade
-# 重启应用
-```
-
-### 数据备份
-
-```bash
-# 使用 Makefile
-make backup
-
-# 手动备份
-tar -czf backup_$(date +%Y%m%d_%H%M%S).tar.gz \
-    config.ini data/ logs/
-```
-
-### 卸载
-
-```bash
-# 使用卸载脚本
-chmod +x uninstall.sh
-./uninstall.sh
-
-# 手动卸载 Docker
-docker-compose down -v
-docker rmi telesubmit-v2
-
-# 手动卸载 Systemd
-sudo systemctl stop telesubmit
-sudo systemctl disable telesubmit
-sudo rm /etc/systemd/system/telesubmit.service
-```
-
----
-
 ## 📖 完整文档
 
 <table>
@@ -599,69 +357,10 @@ sudo rm /etc/systemd/system/telesubmit.service
 
 ### 📚 推荐阅读顺序
 
-1. **首次部署**：README → 部署指南
-2. **日常使用**：README（命令部分）
-3. **管理维护**：管理员指南
-4. **深入了解**：`docs/archive/` 技术文档
-
----
-
-## 🛠️ 故障排查
-
-### ❌ 机器人无响应
-
-**1. 检查配置**
-```bash
-python3 check_config.py
-```
-
-**2. 查看日志**
-```bash
-# Docker
-docker-compose logs -f
-
-# Systemd
-sudo journalctl -u telesubmit -n 50
-
-# 直接运行
-tail -f logs/error.log
-```
-
-**3. 验证网络**
-```bash
-ping api.telegram.org
-curl https://api.telegram.org/bot<YOUR_TOKEN>/getMe
-```
-
-### ❌ 无法发送到频道
-
-检查清单：
-- ✅ 机器人是频道管理员
-- ✅ 有「发布消息」权限
-- ✅ 频道 ID 格式正确
-  - 公开频道：`@channel_username`
-  - 私有频道：`-100xxxxxxxxxx`
-
-### ❌ 搜索功能不工作
-
-重建搜索索引：
-```bash
-# 直接运行
-python3 migrate_to_search.py
-
-# Docker
-docker exec telesubmit-v2 python migrate_to_search.py
-```
-
-### ❌ 权限错误
-
-修复文件权限：
-```bash
-chmod -R 755 data/ logs/
-chown -R $USER:$USER data/ logs/
-```
-
-> 📘 更多问题请查看 [部署指南](DEPLOYMENT.md) 故障排查章节
+1. **首次部署**：README → [部署指南](DEPLOYMENT.md)
+2. **日常使用**：README（命令部分） 
+3. **管理维护**：[管理员指南](ADMIN_GUIDE.md)
+4. **更新维护**：运行 `./update.sh` 自动更新
 
 ---
 
@@ -708,39 +407,6 @@ TeleSubmit-v2/
 
 ---
 
-## 🔐 安全建议
-
-1. **保护配置文件**
-   ```bash
-   chmod 600 config.ini
-   ```
-
-2. **使用环境变量**（可选）
-   ```bash
-   export TOKEN="your_bot_token"
-   export CHANNEL_ID="@your_channel"
-   export OWNER_ID="123456789"
-   ```
-
-3. **定期备份数据**
-   ```bash
-   # 添加到 crontab
-   0 2 * * * cd /path/to/TeleSubmit-v2 && make backup
-   ```
-
-4. **更新依赖包**
-   ```bash
-   pip3 install -r requirements.txt --upgrade
-   ```
-
-5. **监控日志**
-   ```bash
-   # 设置日志轮转
-   logrotate /etc/logrotate.d/telesubmit
-   ```
-
----
-
 ## 📊 系统要求
 
 ### 最低配置
@@ -762,18 +428,6 @@ TeleSubmit-v2/
 | **内存** | >= 1 GB |
 | **磁盘** | >= 5 GB |
 | **CPU** | >= 2 核 |
-
----
-
-## 📦 依赖项
-
-```txt
-python-telegram-bot >= 20.0    # Telegram Bot API 框架
-whoosh >= 2.7.4                # 全文搜索引擎
-jieba >= 0.42.1                # 中文分词
-Pillow >= 10.0.0               # 图像处理
-psutil >= 5.9.0                # 系统监控
-```
 
 ---
 
@@ -838,75 +492,11 @@ psutil >= 5.9.0                # 系统监控
 
 ---
 
-## 🎯 使用示例
-
-### 📝 投稿示例
-
-```
-👤 用户: /submit
-🤖 机器人: 请选择投稿类型...
-
-👤 用户: [选择"媒体投稿"]
-🤖 机器人: 请上传媒体文件...
-
-👤 用户: [上传3张图片]
-👤 用户: /done_media
-
-🤖 机器人: 请输入标签...
-👤 用户: Python 编程 教程
-
-🤖 机器人: 请输入链接（可选）...
-👤 用户: https://example.com
-
-🤖 机器人: 预览如下，确认发布？
-👤 用户: [点击"确认发布"]
-
-✅ 发布成功！
-```
-
-### 🔍 搜索示例
-
-```bash
-# 搜索 Python 相关内容
-/search Python
-
-# 搜索本周的 Python 教程
-/search Python教程 -t week
-
-# 搜索最近 20 个编程相关内容
-/search 编程 -n 20
-```
-
-### 📊 统计示例
-
-```bash
-# 查看本周热门 Top 10
-/hot 10 week
-
-# 查看我的投稿统计
-/mystats
-
-# 查看标签云 Top 30
-/tags 30
-```
-
----
-
-## 🌟 致谢
-
-感谢以下开源项目：
-
-- [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot) - Telegram Bot API 框架
-- [Whoosh](https://github.com/mchaput/whoosh) - 纯 Python 搜索引擎
-- [jieba](https://github.com/fxsjy/jieba) - 中文分词库
-
----
-
 <div align="center">
 
 ### 🎉 开始使用吧！
 
-**如遇问题，请先运行 `python3 check_config.py` 诊断配置**
+**如遇问题，请查看 [部署指南](DEPLOYMENT.md) 的故障排查章节**
 
 Made with ❤️ by [zoidberg-xgd](https://github.com/zoidberg-xgd)
 

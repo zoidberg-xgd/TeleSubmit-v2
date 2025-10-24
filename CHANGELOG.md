@@ -80,6 +80,29 @@
 - 改进代码示例的可读性
 - 优化移动端阅读体验
 
+### 🧹 文档清理
+
+- **精简 README.md**（从 918 行减少到 ~500 行）：
+  - 移除与 DEPLOYMENT.md 重复的部署细节
+  - 移除详细的故障排查内容（指向部署指南）
+  - 移除冗长的配置示例（保留最小配置）
+  - 移除重复的 Docker、更新、安全建议章节
+  - 精简使用示例和依赖列表
+  - 保持核心功能展示和命令参考
+
+- **删除重复/过时文档**：
+  - `DEPLOY_GUIDE.md`（与 DEPLOYMENT.md 重复）
+  - `PROJECT_READY.md`（临时项目状态文件）
+  - `PRIVACY_PROTECTION_SUMMARY.md`（临时总结文件）
+  - `GITHUB_FILES.md`、`GITHUB_UPLOAD_GUIDE.md`、`PUSH_TO_GITHUB.md`（开发临时文件）
+  - `隐私保护完成.md`（中文临时文件）
+
+- **文档结构优化**：
+  - README：项目介绍、快速开始、核心功能、命令参考
+  - DEPLOYMENT.md：详细部署、配置、更新、故障排查
+  - ADMIN_GUIDE.md：管理功能详解
+  - CHANGELOG.md：版本历史记录
+
 ---
 
 ## [2.1.0] - 2025-10-24
