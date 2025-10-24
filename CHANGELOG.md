@@ -9,6 +9,14 @@
 
 ## [未发布]
 
+### 🐛 Bug 修复
+
+- **修复数据库列名错误**:
+  - 🔧 修复删除功能中的 SQL 错误：`no such column: id`
+  - 🔧 将所有删除操作的 SQL 查询从 `id` 改为 `rowid`
+  - 📝 `published_posts` 表的主键是 `message_id`，没有 `id` 列
+  - 📝 使用 SQLite 的 `rowid` 隐式列来引用行 ID
+
 ### 🚀 新增功能
 
 - **帖子删除功能（OWNER 专用）**:

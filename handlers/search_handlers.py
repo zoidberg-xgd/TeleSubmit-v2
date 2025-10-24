@@ -719,7 +719,7 @@ async def delete_posts_batch(update: Update, context: CallbackContext):
                 try:
                     # 查询帖子是否存在
                     await cursor.execute(
-                        "SELECT id, message_id, related_message_ids FROM published_posts WHERE message_id=?",
+                        "SELECT rowid, message_id, related_message_ids FROM published_posts WHERE message_id=?",
                         (msg_id,)
                     )
                     post = await cursor.fetchone()
@@ -748,7 +748,7 @@ async def delete_posts_batch(update: Update, context: CallbackContext):
                         logger.warning(f"从索引删除消息 {msg_id} 失败: {e}")
                     
                     # 从数据库删除
-                    await cursor.execute("DELETE FROM published_posts WHERE id=?", (post['id'],))
+                    await cursor.execute("DELETE FROM published_posts WHERE rowid=?", (post['rowid'],))
                     success_count += 1
                     logger.info(f"批量删除：已删除帖子 message_id={msg_id}")
                     
