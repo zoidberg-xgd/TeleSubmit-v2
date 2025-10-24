@@ -20,54 +20,52 @@ Telegram 频道投稿机器人，支持媒体上传、全文搜索、热度统�
 
 ## 快速开始
 
-### 🌐 云端部署（最简单）
+### 💻 部署方式
 
-**推荐使用 Railway.app 一键部署**：
-
-- ✅ **免费起步**：512MB RAM，500 小时/月
-- ✅ **5 分钟完成**：从 GitHub 自动部署
-- ✅ **零配置**：自动检测和构建
-- ✅ **数据持久化**：支持 SQLite 和搜索索引保存
-
-📚 详细教程：[Railway 部署指南](DEPLOY_RAILWAY.md)
+#### 方式一：快速启动向导（推荐新手）
 
 ```bash
-# 1. 推送代码到 GitHub
 git clone https://github.com/zoidberg-xgd/TeleSubmit-v2.git
 cd TeleSubmit-v2
-git push origin main
-
-# 2. 访问 https://railway.app
-# 3. 选择 "Deploy from GitHub repo"
-# 4. 配置环境变量（BOT_TOKEN, CHANNEL_ID 等）
-# 5. 完成！
+./quickstart.sh
 ```
 
-### 💻 本地部署
+快速启动向导会：
+- 🔍 **自动检测**系统环境（Python、Docker、Git）
+- 📋 **智能推荐**最适合的部署方式
+- 🎯 **一键部署**简化操作流程
 
-#### 方式一：一键安装（推荐）
+#### 方式二：一键安装（完整向导）
 
 ```bash
 git clone https://github.com/zoidberg-xgd/TeleSubmit-v2.git
 cd TeleSubmit-v2
-chmod +x install.sh
 ./install.sh
 ```
 
-安装脚本会自动检测环境、安装依赖、引导配置、启动服务。
+一键安装脚本会：
+- ✓ 检测 Python 版本和依赖
+- ✓ 自动安装所需包
+- ✓ 交互式配置向导
+- ✓ 初始化数据库
+- ✓ 自动启动机器人
 
-#### 方式二：Docker 部署
+#### 方式三：Docker 部署（推荐生产环境）
 
 ```bash
 git clone https://github.com/zoidberg-xgd/TeleSubmit-v2.git
 cd TeleSubmit-v2
 cp config.ini.example config.ini
 nano config.ini  # 填入必要配置
-chmod +x deploy.sh
 ./deploy.sh
 ```
 
-#### 方式三：直接运行
+Docker 部署优势：
+- 🔒 **环境隔离**：独立运行环境
+- 🔄 **自动重启**：异常退出自动恢复
+- 📦 **易于迁移**：一键部署到任何服务器
+
+#### 方式四：手动部署（高级用户）
 
 ```bash
 git clone https://github.com/zoidberg-xgd/TeleSubmit-v2.git
@@ -75,7 +73,6 @@ cd TeleSubmit-v2
 pip3 install -r requirements.txt
 cp config.ini.example config.ini
 nano config.ini  # 填入必要配置
-chmod +x start.sh
 ./start.sh
 ```
 
@@ -286,37 +283,44 @@ TeleSubmit-v2/
 └── uninstall.sh         # 卸载脚本
 ```
 
-## 系统要求
+## 部署环境要求
 
 **最低配置：**
 - 操作系统：Linux / macOS / Windows (WSL2)
-- Python：>= 3.10
-- 内存：>= 512 MB
-- 磁盘：>= 1 GB
+- Python：>= 3.9
+- 内存：>= 256 MB
+- 磁盘：>= 500 MB
 - 网络：可访问 api.telegram.org
 
 **推荐配置：**
-- 操作系统：Ubuntu 22.04 LTS / Debian 12
+- 操作系统：Ubuntu 22.04 LTS / Debian 12 / macOS
 - Python：3.11+
-- 内存：>= 1 GB
-- 磁盘：>= 5 GB
-- CPU：>= 2 核
+- 内存：>= 512 MB
+- 磁盘：>= 2 GB
+- CPU：>= 1 核
+
+**Docker 部署：**
+- Docker：>= 20.10
+- Docker Compose：>= 2.0
+- 内存：>= 512 MB（容器限制）
 
 ## 文档
 
 | 文档 | 说明 |
 |------|------|
 | [README](README.md) | 项目介绍、快速开始 |
+| [脚本指南](SCRIPTS_GUIDE.md) | **所有管理脚本详细说明** |
 | [部署指南](DEPLOYMENT.md) | 详细部署步骤、故障排查 |
 | [管理员指南](ADMIN_GUIDE.md) | 管理功能、系统维护 |
 | [索引管理器](INDEX_MANAGER_README.md) | 搜索索引管理工具 |
 | [更新日志](CHANGELOG.md) | 版本历史、功能更新 |
 
 推荐阅读顺序：
-1. 首次部署：README → 部署指南
+1. 首次部署：README → 脚本指南 → 部署指南
 2. 日常使用：README（命令部分）
-3. 管理维护：管理员指南
-4. 更新系统：运行 `./update.sh`
+3. 脚本使用：脚本指南（所有脚本详解）
+4. 管理维护：管理员指南
+5. 更新系统：运行 `./update.sh`
 
 ## 故障排查
 
