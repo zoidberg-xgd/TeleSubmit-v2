@@ -264,12 +264,24 @@ Bot 会自动控制请求速率。
    ```
 
 3. **查看文档**：
-   - `DEPLOYMENT.md` - 部署配置
-   - `docs/archive/ALGORITHM_REFERENCE.md` - 算法详解
+   - [部署指南](DEPLOYMENT.md) - 部署配置和故障排查
+   - [管理员指南](ADMIN_GUIDE.md) - 管理功能详解
+   - [内存占用说明](MEMORY_USAGE.md) - 性能优化
 
 4. **提交 Issue**：
    如果是 Bug，请在 GitHub 提交 Issue，附上：
    - 诊断工具的输出
    - 相关日志
    - Bot 配置（隐藏敏感信息）
+
+---
+
+## 相关文档
+
+- [README](README.md) - 项目介绍和快速开始
+- [部署指南](DEPLOYMENT.md) - 部署步骤和故障排查
+- [管理员指南](ADMIN_GUIDE.md) - 管理功能和系统维护
+- [脚本指南](SCRIPTS_GUIDE.md) - 所有管理脚本说明
+- [索引管理器](INDEX_MANAGER_README.md) - 搜索索引管理
+- [内存占用说明](MEMORY_USAGE.md) - 内存使用分析
 

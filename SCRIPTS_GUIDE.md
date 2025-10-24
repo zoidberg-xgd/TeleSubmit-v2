@@ -393,8 +393,18 @@ pwd                    # 确认当前目录
 
 ---
 
-**更多帮助：**
-- 主文档：[README.md](README.md)
-- 部署指南：[DEPLOYMENT.md](DEPLOYMENT.md)
+## 相关文档
+
+- [README](README.md) - 项目介绍和快速开始
+- [部署指南](DEPLOYMENT.md) - 部署步骤和故障排查
+- [管理员指南](ADMIN_GUIDE.md) - 管理功能和系统维护
+- [索引管理器](INDEX_MANAGER_README.md) - 搜索索引管理
+- [内存占用说明](MEMORY_USAGE.md) - 内存使用分析
+- [更新日志](CHANGELOG.md) - 版本历史
+
+---
+
+**获取帮助：**
 - 问题反馈：[GitHub Issues](https://github.com/zoidberg-xgd/TeleSubmit-v2/issues)
+- 功能建议：[GitHub Discussions](https://github.com/zoidberg-xgd/TeleSubmit-v2/discussions)
 

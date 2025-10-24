@@ -112,6 +112,7 @@ PRIVACY_PROTECTION_SUMMARY.md
 *_FIX.md
 *_QUICKSTART.md
 *_README.md
+!INDEX_MANAGER_README.md
 SEARCH_*.md
 FILE_TYPE_*.md
 FEATURE_*.md
@@ -129,6 +130,7 @@ DEPLOYMENT_*.md
 
 # 内存分析文档（临时分析文档）
 MEMORY_*.md
+!MEMORY_USAGE.md
 analyze_memory.py
 
 # 其他临时文件

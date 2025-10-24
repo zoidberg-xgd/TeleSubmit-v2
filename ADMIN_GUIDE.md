@@ -552,6 +552,15 @@ job_queue.run_repeating(
 
 ---
 
+## 相关文档
+
+- [README](README.md) - 项目介绍和快速开始
+- [脚本指南](SCRIPTS_GUIDE.md) - 所有管理脚本详细说明
+- [部署指南](DEPLOYMENT.md) - 部署步骤和故障排查
+- [索引管理器](INDEX_MANAGER_README.md) - 搜索索引管理
+- [内存占用说明](MEMORY_USAGE.md) - 内存使用分析
+- [更新日志](CHANGELOG.md) - 版本历史
+
 ## 相关文件
 
 - `config.ini` - 主配置文件
