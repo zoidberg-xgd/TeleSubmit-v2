@@ -10,9 +10,42 @@ Telegram 频道投稿机器人，支持媒体上传、全文搜索、热度统�
 - **标签系统**：标签云可视化
 - **黑名单管理**：用户权限控制
 
+## 系统要求
+
+- **内存**: 256 MB - 1 GB（取决于频道规模）
+- **磁盘**: 100 MB 以上
+- **Python**: 3.9+（推荐 3.11）
+
+详细内存占用分析请查看 [内存占用说明](MEMORY_USAGE.md)。
+
 ## 快速开始
 
-### 方式一：一键安装（推荐）
+### 🌐 云端部署（最简单）
+
+**推荐使用 Railway.app 一键部署**：
+
+- ✅ **免费起步**：512MB RAM，500 小时/月
+- ✅ **5 分钟完成**：从 GitHub 自动部署
+- ✅ **零配置**：自动检测和构建
+- ✅ **数据持久化**：支持 SQLite 和搜索索引保存
+
+📚 详细教程：[Railway 部署指南](DEPLOY_RAILWAY.md)
+
+```bash
+# 1. 推送代码到 GitHub
+git clone https://github.com/zoidberg-xgd/TeleSubmit-v2.git
+cd TeleSubmit-v2
+git push origin main
+
+# 2. 访问 https://railway.app
+# 3. 选择 "Deploy from GitHub repo"
+# 4. 配置环境变量（BOT_TOKEN, CHANNEL_ID 等）
+# 5. 完成！
+```
+
+### 💻 本地部署
+
+#### 方式一：一键安装（推荐）
 
 ```bash
 git clone https://github.com/zoidberg-xgd/TeleSubmit-v2.git
@@ -23,7 +56,7 @@ chmod +x install.sh
 
 安装脚本会自动检测环境、安装依赖、引导配置、启动服务。
 
-### 方式二：Docker 部署
+#### 方式二：Docker 部署
 
 ```bash
 git clone https://github.com/zoidberg-xgd/TeleSubmit-v2.git
@@ -34,7 +67,7 @@ chmod +x deploy.sh
 ./deploy.sh
 ```
 
-### 方式三：直接运行
+#### 方式三：直接运行
 
 ```bash
 git clone https://github.com/zoidberg-xgd/TeleSubmit-v2.git
