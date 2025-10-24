@@ -76,7 +76,8 @@ class SearchHit:
     def __init__(self, message_id: int, title: str, description: str, 
                  tags: str, filename: str, link: str, user_id: int, username: str,
                  publish_time: datetime, views: int, heat_score: float,
-                 highlighted_title: str = "", highlighted_desc: str = ""):
+                 highlighted_title: str = "", highlighted_desc: str = "",
+                 matched_fields: List[str] = None):
         self.message_id = message_id
         self.title = title
         self.description = description
@@ -90,6 +91,7 @@ class SearchHit:
         self.heat_score = heat_score
         self.highlighted_title = highlighted_title or title
         self.highlighted_desc = highlighted_desc or description
+        self.matched_fields = matched_fields or []  # 记录匹配的字段
 
 
 class SearchResult:
@@ -252,6 +254,20 @@ class PostSearchEngine:
                     highlighted_title = self.highlighter.highlight_hit(hit, 'title') or hit.get('title', '')
                     highlighted_desc = self.highlighter.highlight_hit(hit, 'description') or hit.get('description', '')
                     
+                    # 检测匹配字段
+                    matched_fields = []
+                    if query_str.strip():
+                        # 简单检查：看看查询词是否在各个字段中
+                        query_lower = query_str.lower()
+                        if hit.get('title', '').lower().find(query_lower) != -1:
+                            matched_fields.append('标题')
+                        if hit.get('description', '').lower().find(query_lower) != -1:
+                            matched_fields.append('简介')
+                        if hit.get('tags', '').lower().find(query_lower) != -1:
+                            matched_fields.append('标签')
+                        if hit.get('filename', '').lower().find(query_lower) != -1:
+                            matched_fields.append('文件名')
+                    
                     search_hit = SearchHit(
                         message_id=int(hit.get('message_id', 0)),
                         title=hit.get('title', ''),
@@ -265,7 +281,8 @@ class PostSearchEngine:
                         views=hit.get('views', 0),
                         heat_score=hit.get('heat_score', 0),
                         highlighted_title=highlighted_title,
-                        highlighted_desc=highlighted_desc
+                        highlighted_desc=highlighted_desc,
+                        matched_fields=matched_fields
                     )
                     hits.append(search_hit)
                 
