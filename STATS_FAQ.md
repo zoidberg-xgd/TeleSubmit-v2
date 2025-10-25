@@ -132,23 +132,23 @@ forwards = forwarded.forwards  # 转发量
 **方法 1：重建索引**（推荐）
 
 ```bash
-python3 rebuild_search_index.py
+python3 migrate_to_search.py --clear
 ```
 
-这会从数据库重新构建索引，自动清理不存在的消息。
+这会清空并从数据库重新构建索引，自动清理不存在的消息。
 
-**方法 2：清理数据库**
+**方法 2：清理数据库（仅当确认消息已在频道删除）**
 
 ```sql
 -- 连接到数据库
 sqlite3 data/submissions.db
 
 -- 查找可能已删除的帖子（浏览量长期为0的）
-SELECT id, message_id, title FROM published_posts 
-WHERE views = 0 AND julianday('now') - julianday(publish_time) > 7;
+SELECT message_id, title FROM published_posts 
+WHERE views = 0 AND (strftime('%s','now') - publish_time) > 7*24*3600;
 
 -- 如果确认是已删除的帖子，手动删除记录
-DELETE FROM published_posts WHERE id = <帖子ID>;
+DELETE FROM published_posts WHERE message_id = <消息ID>;
 ```
 
 **方法 3：让 Bot 自动检测**（未来功能）
@@ -186,7 +186,14 @@ DELETE FROM published_posts WHERE id = <帖子ID>;
 热度分数 = (有效浏览 × 0.3 + 有效转发 × 10 × 0.4 + 有效反应 × 5 × 0.3) × 时间衰减
 ```
 
-详细说明请查看：`docs/archive/ALGORITHM_REFERENCE.md`
+附：热度计算核心要点（简版）
+
+```
+有效浏览 = 主帖浏览 × 70% + 回复平均浏览 × 30% × 回复数
+有效转发 = 所有消息的转发数取最大值
+有效反应 = 主帖反应 × 50% + 回复反应总和 × 50%
+热度分数 = (有效浏览 × 0.3 + 有效转发 × 10 × 0.4 + 有效反应 × 5 × 0.3) × 时间衰减(7天半衰期)
+```
 
 ## 🚀 性能优化建议
 

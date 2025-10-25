@@ -471,14 +471,14 @@ python3 migrate_to_search.py
 1. 查看上面的故障排查部分
 2. 运行 `python3 check_config.py` 诊断
 3. 查看日志寻找错误信息
-4. 参考 DEPLOY_GUIDE.md 中的故障排查章节
+4. 参考 `DEPLOYMENT.md` 中的故障排查章节
 
 ---
 
 **祝测试顺利！** 🚀
 
 如有问题，请查看：
-- [DEPLOY_GUIDE.md](DEPLOY_GUIDE.md) - 详细故障排查
-- [EASY_START.md](EASY_START.md) - 常见问题解答
+- [DEPLOYMENT.md](../../DEPLOYMENT.md) - 详细故障排查
+- [README.md](../../README.md) - 快速开始与常见问题
 - 运行 `python3 check_config.py` - 配置诊断
 
