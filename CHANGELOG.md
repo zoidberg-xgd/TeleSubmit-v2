@@ -11,17 +11,9 @@
 
 ### 🚀 新增功能
 
-- **Railway 云端部署支持** 🌐:
-  - ✨ 添加完整的 Railway.app 部署配置
-  - 📄 创建 `railway.json` 配置文件
-  - 📄 创建 `Procfile` 启动文件
-  - 📄 创建 `runtime.txt` 指定 Python 3.11
-  - 📄 创建 `.dockerignore` 优化构建
-  - 📚 详细教程：`DEPLOY_RAILWAY.md` Railway 部署指南
-  - 💡 支持免费部署（512MB RAM，500 小时/月）
-  - 💾 支持数据持久化（SQLite + 搜索索引）
-  - 🔧 环境变量配置说明
-  - 📊 成本估算和优化建议
+- 计划：Railway 云端部署支持（草拟中） 🌐
+  - 注：上述文件与文档将于合并后提供：`railway.json`、`Procfile`、`runtime.txt`、`.dockerignore`、`DEPLOY_RAILWAY.md`
+  - 当前仓库尚未包含这些文件，文档待补充
 
 - **内存占用分析工具**:
   - 📊 创建内存分析工具 (`analyze_memory.py`)
@@ -30,14 +22,11 @@
   - 📚 详细文档：`MEMORY_USAGE.md` 内存占用说明
 
 - **索引管理器 (Index Manager)**:
-  - ✨ 创建完整的索引管理工具 (`utils/index_manager.py`)
-  - 🔄 索引重建功能：支持完全重建搜索索引
-  - 🔄 增量同步功能：自动同步数据库和索引
-  - ⚡ 索引优化功能：提升搜索性能
-  - 📊 索引统计功能：监控索引状态
-  - 🤖 自动重建机制：启动时检测 Schema 不匹配并自动修复
-  - 🧪 测试脚本：`test_index_manager.py` 完整功能测试
-  - 📚 详细文档：`INDEX_MANAGER_README.md` 使用指南
+  - ✨ 提供 `utils/index_manager.py`（代码已包含）
+  - 🔄 支持重建、同步、优化、统计
+  - 🤖 自动重建机制：启动时检测 Schema 不匹配尝试修复
+  - 📚 文档：`INDEX_MANAGER_README.md`
+  - 注：`test_index_manager.py` 测试脚本当前未包含
 
 ### 🐛 Bug 修复
 
@@ -48,10 +37,8 @@
   - 🔧 简化索引优化逻辑避免 API 兼容性问题
 
 - **修复数据库列名错误**:
-  - 🔧 修复删除功能中的 SQL 错误：`no such column: id`
-  - 🔧 将所有删除操作的 SQL 查询从 `id` 改为 `rowid`
   - 📝 `published_posts` 表的主键是 `message_id`，没有 `id` 列
-  - 📝 使用 SQLite 的 `rowid` 隐式列来引用行 ID
+  - 🔧 删除相关说明中误用 `id` 的示例，统一为 `message_id`
 
 ### 💼 之前的新增功能
 
@@ -116,7 +103,7 @@
 
 ---
 
-## [2.2.0] - 2025-10-24
+## [2.2.0] - 2025-10-25
 
 ### 🚀 新增功能
 
@@ -222,7 +209,7 @@
 
 ---
 
-## [2.1.0] - 2025-10-24
+## [2.1.0] - 2025-10-25
 
 ### 🎉 新增功能
 
@@ -260,7 +247,7 @@
 
 ---
 
-## [2.0.0] - 2024-10-24
+## [2.0.0] - 2025-10-25
 
 ### 🎉 重大更新
 

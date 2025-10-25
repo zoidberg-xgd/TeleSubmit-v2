@@ -3,6 +3,8 @@
 提供索引重建、同步、优化等功能
 """
 import logging
+import argparse
+import json
 import asyncio
 import aiosqlite
 import os
@@ -404,4 +406,74 @@ async def auto_rebuild_index_if_needed() -> dict:
         "reason": "索引已同步",
         "stats": stats
     }
+
+
+# -------------------------
+# 简单命令行接口（CLI）
+# -------------------------
+def _print_json(data: dict):
+    try:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+    except Exception:
+        print(data)
+
+
+def _exit_code_from_result(result: dict) -> int:
+    if not isinstance(result, dict):
+        return 1
+    # status 命令不以不同步为失败
+    if "error" in result:
+        return 1
+    if "success" in result:
+        return 0 if result.get("success") else 1
+    return 0
+
+
+def cli_main() -> int:
+    parser = argparse.ArgumentParser(description="TeleSubmit 索引管理工具")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    # rebuild
+    p_rebuild = subparsers.add_parser("rebuild", help="重建索引（可先清空）")
+    p_rebuild.add_argument("--no-clear", action="store_true", help="不先清空索引，直接重建")
+
+    # sync
+    subparsers.add_parser("sync", help="同步索引（仅补齐缺失并清理多余）")
+
+    # status
+    subparsers.add_parser("status", help="查看索引与数据库统计")
+
+    # optimize
+    subparsers.add_parser("optimize", help="优化索引（合并段）")
+
+    args = parser.parse_args()
+
+    manager = get_index_manager()
+
+    if args.command == "rebuild":
+        result = asyncio.run(manager.rebuild_index(clear_first=not args.no_clear))
+        _print_json(result)
+        return _exit_code_from_result(result)
+
+    if args.command == "sync":
+        result = asyncio.run(manager.sync_index())
+        _print_json(result)
+        return _exit_code_from_result(result)
+
+    if args.command == "status":
+        result = asyncio.run(manager.get_index_stats())
+        _print_json(result)
+        return _exit_code_from_result(result)
+
+    if args.command == "optimize":
+        result = asyncio.run(manager.optimize_index())
+        _print_json(result)
+        return _exit_code_from_result(result)
+
+    parser.print_help()
+    return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(cli_main())
 

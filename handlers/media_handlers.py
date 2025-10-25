@@ -13,6 +13,8 @@ from utils.helper_functions import (
     validate_state, end_conversation_with_message, handle_conversation_error,
     get_submission_mode, parse_json_list
 )
+from utils.file_validator import create_file_validator
+from config.settings import ALLOWED_FILE_TYPES
 
 logger = logging.getLogger(__name__)
 
@@ -312,11 +314,14 @@ async def switch_to_doc_mode(update: Update, context: CallbackContext) -> int:
             await conn.commit()
         
         # 3. 发送新的欢迎消息（简化版本）
+        file_validator = create_file_validator(ALLOWED_FILE_TYPES)
+        allowed_types_desc = file_validator.get_allowed_types_description()
         welcome_text = (
             "📮 欢迎使用文档投稿功能！请按照以下步骤提交：\n\n"
             "1️⃣ 发送文档文件（必选）：\n"
-            "   - 支持ZIP、RAR等压缩包和PDF、DOC等文档格式\n"
+            "   - 至少上传1个文件，最多上传10个文件。\n"
             "   - 点击聊天输入框旁的📎图标选择文件\n"
+            f"   - ✅ 允许的文件类型：\n{allowed_types_desc}\n"
             "   - 上传完毕后，发送 /done_doc\n\n"
             "2️⃣ 发送媒体文件（可选）：\n"
             "   - 支持图片、视频、GIF等，直接发送（非附件形式）\n"

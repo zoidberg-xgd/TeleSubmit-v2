@@ -10,14 +10,9 @@
 
 | 文档 | 说明 | 适用场景 |
 |------|------|----------|
-| `ALGORITHM_REFERENCE.md` | 热度算法详解 | 了解热度计算原理 |
-| `BUGFIX_SUMMARY.md` | Bug 修复记录 | 查看历史问题修复 |
-| `COMMAND_PERMISSION_FIX.md` | 命令权限修复说明 | 了解权限控制实现 |
 | `MULTI_MESSAGE_STATS.md` | 多消息统计功能 | 了解统计功能实现 |
 | `TAG_CLOUD_FIX_README.md` | 标签云修复说明 | 标签系统技术细节 |
 | `TESTING_GUIDE.md` | 完整测试清单 | 功能验证和测试 |
-| `EASY_START.md` | 简易启动指南 | 快速部署参考 |
-| `📖_文档导航.md` | 旧版文档导航 | 历史参考 |
 
 ## 🎯 使用建议
 
@@ -26,7 +21,7 @@
 大多数用户只需要阅读以下核心文档：
 
 1. **[../README.md](../README.md)** - 项目说明和快速开始
-2. **[../DEPLOY_GUIDE.md](../DEPLOY_GUIDE.md)** - 部署指南
+2. **[../DEPLOYMENT.md](../DEPLOYMENT.md)** - 部署指南
 3. **[../ADMIN_GUIDE.md](../ADMIN_GUIDE.md)** - 管理员手册
 
 ### 深入研究
@@ -42,7 +37,7 @@
 ## 🔗 快速链接
 
 - [返回主 README](../README.md)
-- [部署指南](../DEPLOY_GUIDE.md)
+- [部署指南](../DEPLOYMENT.md)
 - [管理员手册](../ADMIN_GUIDE.md)
 - [更新日志](../CHANGELOG.md)
 

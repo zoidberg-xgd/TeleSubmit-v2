@@ -132,7 +132,7 @@ python3 -c "from utils.database import init_db; init_db()"
 编辑 `config.ini` 文件，配置以下必填项：
 
 ```ini
-[Telegram]
+[BOT]
 TOKEN = your_bot_token_here        # Bot Token
 CHANNEL_ID = @your_channel         # 频道 ID
 OWNER_ID = 123456789               # 管理员 User ID
@@ -141,27 +141,53 @@ OWNER_ID = 123456789               # 管理员 User ID
 ### 可选配置
 
 ```ini
-[Search]
+[BOT]
+# 数据库文件路径（投稿与索引所用的 SQLite 数据库）
+DB_PATH = data/submissions.db
+
+# 会话超时时间（秒）
+TIMEOUT = 300
+
+# 单次投稿允许的最大标签数量
+ALLOWED_TAGS = 30
+
+# 额外管理员（逗号分隔，整数 ID）。OWNER_ID 会自动加入
+# ADMIN_IDS = 123456789,987654321
+
+# 在频道帖中是否显示投稿人（true/false）
+SHOW_SUBMITTER = true
+
+# 是否向所有者发送新投稿通知（true/false）
+NOTIFY_OWNER = true
+
+# 机器人工作模式：MEDIA（仅媒体）、DOCUMENT（仅文档）、MIXED（混合）
+BOT_MODE = MIXED
+
+# 允许上传的文档类型（后缀或 MIME，逗号分隔；* 表示全部）
+ALLOWED_FILE_TYPES = *
+
+[SEARCH]
 # 搜索引擎配置
-SEARCH_RESULT_LIMIT = 20           # 每次搜索返回结果数，默认 20
-INDEX_UPDATE_INTERVAL = 3600       # 索引更新间隔（秒），默认 1 小时
+INDEX_DIR = data/search_index      # 索引目录
+ENABLED = true                     # 是否启用搜索
+```
 
-[Statistics]
-# 热度统计配置
-STATS_ENABLED = true               # 是否启用统计功能
-HOT_THRESHOLD = 100                # 热门帖子阈值
-STATS_CACHE_TTL = 300              # 统计缓存时间（秒）
+#### 环境变量覆盖
 
-[Tags]
-# 标签系统配置
-MAX_TAGS_PER_POST = 10             # 每个帖子最多标签数
-TAG_CLOUD_SIZE = 50                # 标签云显示数量
+支持用环境变量覆盖同名配置（环境变量优先）。常用示例：
 
-[Features]
-# 功能开关
-ALLOW_ANONYMOUS = false            # 是否允许匿名投稿
-REQUIRE_APPROVAL = true            # 是否需要审核
-AUTO_DELETE_SPAM = true            # 自动删除垃圾信息
+```bash
+export TOKEN="123456:ABC..."             # 等价于 [BOT].TOKEN
+export CHANNEL_ID="@your_channel"        # 等价于 [BOT].CHANNEL_ID
+export OWNER_ID="123456789"              # 等价于 [BOT].OWNER_ID
+export ADMIN_IDS="123,456"               # 等价于 [BOT].ADMIN_IDS
+export SHOW_SUBMITTER="true"             # 等价于 [BOT].SHOW_SUBMITTER
+export NOTIFY_OWNER="true"               # 等价于 [BOT].NOTIFY_OWNER
+export BOT_MODE="MIXED"                  # 等价于 [BOT].BOT_MODE
+export ALLOWED_FILE_TYPES=".pdf,.zip"    # 等价于 [BOT].ALLOWED_FILE_TYPES
+
+export SEARCH_INDEX_DIR="data/search_index"  # 覆盖 [SEARCH].INDEX_DIR
+export SEARCH_ENABLED="true"                 # 覆盖 [SEARCH].ENABLED
 ```
 
 ### 验证配置
@@ -247,8 +273,8 @@ python3 optimize_database.py
 ### 初始化索引
 
 ```bash
-# 初次建立索引（自动进行）
-python3 -c "from utils.search_engine import SearchEngine; SearchEngine().initialize()"
+# 初次建立索引（系统运行时也会自动创建）
+python3 -c "from utils.search_engine import init_search_engine; init_search_engine('data/search_index', from_scratch=True)"
 ```
 
 ### 重建索引
@@ -366,12 +392,9 @@ python3 utils/index_manager.py rebuild
    ```
 
 3. 调整配置（`config.ini`）：
-   ```ini
-   [Search]
-   SEARCH_RESULT_LIMIT = 10      # 减少搜索结果数
-   
-   [Statistics]
-   STATS_CACHE_TTL = 600         # 增加缓存时间
+```ini
+   [SEARCH]
+   ENABLED = true
    ```
 
 详细内存分析请查看 [内存占用说明](MEMORY_USAGE.md)。
@@ -432,17 +455,16 @@ crontab -e
 
 ```ini
 # config.ini
-[Search]
-SEARCH_RESULT_LIMIT = 15      # 适当减少结果数
-INDEX_UPDATE_INTERVAL = 7200  # 增加更新间隔
+[SEARCH]
+ENABLED = true
 ```
 
 ### 内存优化
 
 ```ini
 # config.ini
-[Statistics]
-STATS_CACHE_TTL = 600         # 增加缓存时间，减少计算
+[SEARCH]
+ENABLED = true
 ```
 
 ## 安全建议
