@@ -65,7 +65,7 @@ Docker 部署优势：
 - 自动重启：异常退出自动恢复
 - 易于迁移：一键部署到任何服务器
 
-#### 方式四：手动部署（高级用户）
+#### 方式四：手动部署
 
 ```bash
 git clone https://github.com/zoidberg-xgd/TeleSubmit-v2.git
@@ -101,7 +101,7 @@ OWNER_ID = 123456789               # 您的 Telegram User ID
 根据您的需求选择合适的方式：
 
 ```bash
-# 方式 1: 一键安装（最简单，推荐新手）
+# 方式 1: 一键安装（最简单）
 ./install.sh
 
 # 方式 2: 快速启动向导（智能选择）
@@ -315,7 +315,7 @@ TeleSubmit-v2/
 | [索引管理器](INDEX_MANAGER_README.md) | 搜索索引管理工具 |
 | [内存占用说明](MEMORY_USAGE.md) | 内存使用分析与优化 |
 | [更新日志](CHANGELOG.md) | 版本历史、功能更新 |
-| [文档导航](docs/INDEX.md) | 所有文档的导航与索引 |
+| 文档导航（已合并到 README 与各专题文档） | — |
 
 推荐阅读顺序：
 1. 首次部署：README → 脚本指南 → 部署指南
