@@ -1,4 +1,4 @@
-# 📊 TeleSubmit-v2 内存占用说明
+# TeleSubmit v2 内存占用说明
 
 ## 快速回答
 
@@ -353,7 +353,7 @@ print(f"内存: {process.memory_info().rss / 1024 / 1024:.2f} MB")
 **原因**: jieba 需要加载中文词典（约 20 MB）
 
 **解决方案**:
-1. 如果不需要搜索功能，禁用 `SEARCH_ENABLED`
+1. 如果不需要搜索功能，禁用 `ENABLED`（位于 `[SEARCH]` 段）
 2. jieba 只在搜索时使用，内存占用是一次性的
 
 ---
@@ -375,6 +375,4 @@ print(f"内存: {process.memory_info().rss / 1024 / 1024:.2f} MB")
 
 ---
 
-**最后更新**: 2025-10-25  
-**维护者**: TeleSubmit-v2 团队
 
