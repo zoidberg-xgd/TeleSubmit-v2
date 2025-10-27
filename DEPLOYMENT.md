@@ -459,18 +459,29 @@ crontab -e
 
 ### 搜索性能优化
 
+如果不需要搜索功能，可以关闭以降低内存占用：
+
 ```ini
 # config.ini
 [SEARCH]
-ENABLED = true
+ENABLED = false
 ```
 
 ### 内存优化
 
+对于内存受限的环境（如 256MB 服务器）：
+
 ```ini
 # config.ini
 [SEARCH]
-ENABLED = true
+# 禁用搜索以节省内存
+ENABLED = false
+```
+
+定期清理旧日志：
+```bash
+# 只保留最近 7 天的日志
+find logs/ -name "*.log" -mtime +7 -delete
 ```
 
 ## 安全建议
