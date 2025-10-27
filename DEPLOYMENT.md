@@ -382,9 +382,15 @@ python3 utils/index_manager.py rebuild
 
 **解决方法**：
 1. 检查内存使用：
-   ```bash
-   python3 analyze_memory.py
-   ```
+   - 机器人内置命令：在私聊中发送 `/debug` 查看实时内存
+   - Docker 环境：
+     ```bash
+     docker stats telesubmit-v2
+     ```
+   - 系统工具：
+     ```bash
+     top -o mem   # 或 htop
+     ```
 
 2. 优化数据库：
    ```bash
