@@ -148,6 +148,7 @@ class PostSearchEngine:
         )
         
         # 创建高亮器
+        # 降低高亮器开销：更短片段，减少内存占用
         self.highlighter = highlight.Highlighter(
             fragmenter=highlight.ContextFragmenter(maxchars=200, surround=50),
             formatter=highlight.HtmlFormatter()
