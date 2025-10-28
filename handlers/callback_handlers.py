@@ -61,6 +61,25 @@ async def handle_callback_query(update: Update, context: CallbackContext):
             await handle_search_action(update, context)
         elif data.startswith("tag_search_"):
             await handle_tag_search(update, context)
+        # 搜索-时间筛选
+        elif data.startswith("time_"):
+            # 记录时间筛选并提示输入关键词
+            mapping = {
+                'time_day': 'day',
+                'time_week': 'week',
+                'time_month': 'month',
+                'time_all': 'all',
+            }
+            time_key = mapping.get(data)
+            if time_key:
+                context.user_data['time_filter'] = time_key
+                if time_key == 'all':
+                    await query.edit_message_text("🔍 已选择时间范围：全部\n请输入搜索关键词：")
+                else:
+                    zh = {'day': '今日', 'week': '本周', 'month': '本月'}[time_key]
+                    await query.edit_message_text(f"🔍 已选择时间范围：{zh}\n请输入搜索关键词：")
+            else:
+                await query.edit_message_text("❌ 无效的时间范围")
         
         # 帖子操作
         elif data.startswith("view_post_"):

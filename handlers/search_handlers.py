@@ -124,6 +124,14 @@ async def search_posts(update: Update, context: CallbackContext):
             time_filter = DateRange("publish_time", start_time, None)
             time_desc = "本月"
         
+        # 处理时间过滤（来自内联时间筛选）
+        time_filter = context.user_data.get('time_filter')
+        if time_filter:
+            # 将时间过滤转换为 -t 选项处理逻辑
+            if '-t' not in context.args:
+                context.args.extend(['-t', time_filter])
+            context.user_data['time_filter'] = None
+
         # 使用搜索引擎
         search_engine = get_search_engine()
         
