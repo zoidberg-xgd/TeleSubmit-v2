@@ -230,11 +230,12 @@ async def main():
     logger.info(f"启动TeleSubmit机器人。版本: {CONFIG.get('VERSION', '0.1.0')}")
     logger.info(f"会话超时时间: {TIMEOUT_SECONDS}秒")
     
-    # 启动健康检查服务器（用于 Fly.io 部署）
-    if HEALTH_SERVER_ENABLED:
+    # 启动健康检查服务器（仅在 Polling 模式下）
+    # Webhook 模式会使用 telegram 的内置服务器
+    if HEALTH_SERVER_ENABLED and RUN_MODE == 'POLLING':
         try:
             start_health_server(port=8080)
-            logger.info("健康检查服务器已启动")
+            logger.info("健康检查服务器已启动（Polling 模式）")
         except Exception as e:
             logger.warning(f"启动健康检查服务器失败: {e}")
     
@@ -332,36 +333,41 @@ async def main():
             logger.error("❌ Webhook 模式需要设置 WEBHOOK_URL")
             sys.exit(1)
         
+        # 导入 Webhook 服务器模块
+        from utils.webhook_server import WebhookServer, setup_webhook
+        
         # 生成或使用 Secret Token
         import secrets
         secret_token = WEBHOOK_SECRET_TOKEN or secrets.token_urlsafe(32)
         if not WEBHOOK_SECRET_TOKEN:
             logger.info(f"已自动生成 Secret Token: {secret_token}")
         
-        # 构建完整的 Webhook URL
-        full_webhook_url = f"{WEBHOOK_URL.rstrip('/')}{WEBHOOK_PATH}"
-        
-        # 先删除旧的 webhook（如果有）
-        try:
-            await application.bot.delete_webhook(drop_pending_updates=True)
-            logger.info("已删除旧的 Webhook")
-        except Exception as e:
-            logger.warning(f"删除旧 Webhook 失败（可能不存在）: {e}")
-        
-        # 使用 python-telegram-bot 内置的 webhook 支持
-        await application.updater.start_webhook(
-            listen='0.0.0.0',
+        # 创建并启动 Webhook 服务器（包含健康检查）
+        webhook_server = WebhookServer(
+            application=application,
             port=WEBHOOK_PORT,
-            url_path=WEBHOOK_PATH,
-            webhook_url=full_webhook_url,
-            secret_token=secret_token,
-            allowed_updates=None,
-            drop_pending_updates=True
+            path=WEBHOOK_PATH,
+            secret_token=secret_token
         )
+        await webhook_server.start()
+        
+        # 设置 Telegram Webhook
+        success = await setup_webhook(
+            application=application,
+            webhook_url=WEBHOOK_URL,
+            webhook_path=WEBHOOK_PATH,
+            secret_token=secret_token
+        )
+        
+        if not success:
+            logger.error("❌ Webhook 设置失败")
+            await webhook_server.stop()
+            sys.exit(1)
         
         logger.info(f"✅ Webhook 模式已启动")
         logger.info(f"   监听地址: 0.0.0.0:{WEBHOOK_PORT}{WEBHOOK_PATH}")
-        logger.info(f"   外部地址: {full_webhook_url}")
+        logger.info(f"   外部地址: {WEBHOOK_URL}{WEBHOOK_PATH}")
+        logger.info(f"   健康检查: http://0.0.0.0:{WEBHOOK_PORT}/health")
         logger.info(f"   Secret Token: {'已设置' if WEBHOOK_SECRET_TOKEN else f'{secret_token[:16]}...'}")
         
     else:
@@ -398,12 +404,19 @@ async def shutdown(application, signal, loop, webhook_server=None):
     """
     logger.info(f"收到信号 {signal.name}，正在关闭...")
     
-    # 如果是 Webhook 模式，删除 webhook
-    if RUN_MODE == 'WEBHOOK':
+    # 如果是 Webhook 模式，停止 webhook 服务器并删除 webhook
+    if webhook_server:
         try:
-            logger.info("正在删除 Webhook...")
+            logger.info("正在停止 Webhook 服务器...")
+            await webhook_server.stop()
+            logger.info("Webhook 服务器已停止")
+        except Exception as e:
+            logger.warning(f"停止 Webhook 服务器失败: {e}")
+        
+        try:
+            logger.info("正在删除 Telegram Webhook...")
             await application.bot.delete_webhook(drop_pending_updates=False)
-            logger.info("Webhook 已删除")
+            logger.info("Telegram Webhook 已删除")
         except Exception as e:
             logger.warning(f"删除 Webhook 失败: {e}")
     
