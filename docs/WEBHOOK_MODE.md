@@ -299,6 +299,26 @@ Telegram 要求 Webhook URL 必须是 HTTPS。Fly.io 自动提供 HTTPS 证书�
 
 ---
 
+## ✅ Fly.io 部署验证
+
+**测试结果**: ✅ 在 256MB 内存环境下成功运行
+
+```bash
+# 已验证配置
+Memory: 256MB
+Region: sjc
+Webhook URL: https://your-app.fly.dev/webhook
+Health Check: OK
+Status: started (稳定运行)
+```
+
+**关键优化**:
+- ✅ 端口复用：Webhook 服务器同时处理 `/webhook` 和 `/health`
+- ✅ 内存优化：使用 `SEARCH_ANALYZER=simple` 节省 ~140MB
+- ✅ 无需额外端口：health.py 仅在 Polling 模式启动
+
+---
+
 ## 🔍 故障排查
 
 ### 1. Webhook 设置失败

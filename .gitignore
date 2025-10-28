@@ -142,6 +142,9 @@ FLYIO_*.md
 DEPLOYMENT_SUMMARY.md
 .dockerignore
 
+# Webhook 测试报告（临时）
+WEBHOOK_TEST_REPORT.md
+
 # 其他临时文件
 *.pyc
 .pytest_cache/

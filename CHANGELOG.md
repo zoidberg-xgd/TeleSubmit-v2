@@ -43,6 +43,19 @@
 - 新增依赖：`aiohttp>=3.9.0`（用于 Webhook）
 - 新增配置项：`RUN_MODE`、`WEBHOOK_URL`、`WEBHOOK_PORT`、`WEBHOOK_PATH`、`WEBHOOK_SECRET_TOKEN`
 
+### 修复
+
+- **端口冲突问题** - health.py 仅在 Polling 模式启动，避免与 Webhook 服务器冲突
+- **Webhook 服务器** - 使用 aiohttp 同时处理 `/webhook` 和 `/health` 端点
+- **优雅关闭** - 正确清理 Webhook 服务器和 Telegram webhook 设置
+
+### 测试
+
+- ✅ 本地测试：Polling 和 Webhook 模式均通过
+- ✅ Fly.io 部署：256MB 环境下稳定运行
+- ✅ Telegram Webhook：成功设置并接收消息
+- ✅ 健康检查：两种模式均正常响应
+
 ---
 
 ## [2.1.0] - 2025-10-28
