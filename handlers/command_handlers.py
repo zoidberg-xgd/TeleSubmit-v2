@@ -45,7 +45,14 @@ async def cancel(update: Update, context: CallbackContext) -> int:
     except Exception as e:
         logger.error(f"取消时删除数据错误: {e}")
     # 清除键盘，避免残留旧按钮
-    await update.message.reply_text("❌ 投稿已取消", reply_markup=ReplyKeyboardRemove())
+    try:
+        await update.message.reply_text("❌ 投稿已取消", reply_markup=ReplyKeyboardRemove())
+    except Exception:
+        # 在极少数情况下 message 可能不存在
+        try:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text="❌ 投稿已取消")
+        except Exception:
+            pass
     return ConversationHandler.END
 
 
@@ -153,6 +160,10 @@ async def handle_menu_shortcuts(update: Update, context: CallbackContext) -> Non
         if context.user_data.get('search_mode'):
             from handlers.search_handlers import handle_search_input
             await handle_search_input(update, context)
+            return
+        # 任何时候文本里出现“取消”都执行取消
+        if "取消" in text:
+            await cancel(update, context)
             return
         # 开始投稿
         if text.endswith("开始投稿"):
