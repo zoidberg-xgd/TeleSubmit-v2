@@ -29,9 +29,9 @@ TeleSubmit v2 支持两种运行模式：**Polling（轮询）** 和 **Webhook**
 RUN_MODE = WEBHOOK
 
 [WEBHOOK]
-# 外部访问地址（必填，例如: https://your-app.fly.dev）
+# 外部访问地址（必填，例如: https://your-domain.com）
 # 注意：必须是 HTTPS 且有效的域名
-URL = https://your-app.fly.dev
+URL = https://your-domain.com
 
 # Webhook 监听端口（默认 8080）
 PORT = 8080
@@ -82,12 +82,11 @@ Environment="WEBHOOK_URL=https://your-domain.com"
 Environment="WEBHOOK_PORT=8080"
 ```
 
-**PaaS 平台示例**：
+**PaaS 平台设置方式**：
 
-- **Fly.io**: `fly secrets set RUN_MODE=WEBHOOK`
-- **Heroku**: `heroku config:set RUN_MODE=WEBHOOK`
-- **Railway**: 在 Dashboard 添加环境变量
-- **Render**: 在 Environment 设置中添加
+通过各平台的环境变量管理界面或 CLI 工具设置：
+- 在 Dashboard/控制面板添加环境变量
+- 或使用平台的 CLI 命令（参考各平台文档）
 
 ---
 
@@ -153,50 +152,38 @@ docker-compose up -d
 
 ### 方式 3：PaaS 平台部署
 
-<details>
-<summary><b>Fly.io</b></summary>
+**通用步骤**（适用于大多数 PaaS 平台）:
 
-```bash
-# 1. 确认应用域名
-fly status -a your-app-name
+1. **设置环境变量**：
+   ```
+   RUN_MODE = WEBHOOK
+   WEBHOOK_URL = https://your-app-domain.com
+   ```
 
-# 2. 配置环境变量
-fly secrets set RUN_MODE=WEBHOOK -a your-app-name
-fly secrets set WEBHOOK_URL=https://your-app.fly.dev -a your-app-name
+2. **配置方式**：
+   - **Web 界面**: 进入应用设置 → 环境变量 → 添加配置
+   - **CLI 工具**: 使用平台提供的命令行工具
+   - **配置文件**: 部分平台支持配置文件管理
 
-# 3. 重启应用
-fly apps restart your-app-name
+3. **重启应用**：
+   - 大多数平台修改环境变量后自动重启
+   - 或手动触发重启/重新部署
 
-# 4. 查看日志
-fly logs -a your-app-name
-```
-</details>
+4. **验证部署**：
+   ```bash
+   # 测试健康检查
+   curl https://your-app-domain.com/health
+   
+   # 检查 Webhook 状态
+   curl https://api.telegram.org/bot<TOKEN>/getWebhookInfo
+   ```
 
-<details>
-<summary><b>Heroku</b></summary>
-
-```bash
-# 1. 设置环境变量
-heroku config:set RUN_MODE=WEBHOOK -a your-app-name
-heroku config:set WEBHOOK_URL=https://your-app-name.herokuapp.com
-
-# 2. 推送部署
-git push heroku main
-
-# 3. 查看日志
-heroku logs --tail -a your-app-name
-```
-</details>
-
-<details>
-<summary><b>Railway</b></summary>
-
-1. 在 Railway Dashboard 添加环境变量：
-   - `RUN_MODE` = `WEBHOOK`
-   - `WEBHOOK_URL` = `https://your-app.railway.app`
-
-2. 重新部署项目
-</details>
+**常见平台环境变量位置**:
+- **Heroku**: Settings → Config Vars
+- **Railway**: Variables → New Variable
+- **Render**: Environment → Add Environment Variable
+- **Vercel**: Settings → Environment Variables
+- **其他平台**: 查看平台设置或文档中的环境变量配置
 
 **启动成功标志**：
 
@@ -245,14 +232,14 @@ docker-compose down && docker-compose up -d
 
 **方式 4：PaaS 平台**
 ```bash
-# Fly.io
-fly secrets set RUN_MODE=WEBHOOK -a your-app-name
-fly apps restart your-app-name
+# 在平台控制面板设置环境变量
+RUN_MODE=WEBHOOK
+WEBHOOK_URL=https://your-domain.com
 
-# Heroku
-heroku config:set RUN_MODE=WEBHOOK -a your-app-name
-
-# Railway/Render: 在 Dashboard 修改环境变量
+# 或使用平台 CLI（参考各平台文档）
+# 示例：通用命令格式
+platform-cli config:set RUN_MODE=WEBHOOK
+platform-cli restart your-app
 ```
 
 ### 从 Webhook 切换到 Polling
@@ -287,8 +274,15 @@ Webhook 模式支持 Secret Token 验证，防止恶意请求：
 # 生成随机 token
 python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 
-# 设置 token
-fly secrets set WEBHOOK_SECRET_TOKEN=your_generated_token -a your-app-name
+# 设置 token（通过配置文件或环境变量）
+# 方式 1: config.ini
+# [WEBHOOK]
+# SECRET_TOKEN = your_generated_token
+
+# 方式 2: 环境变量
+export WEBHOOK_SECRET_TOKEN=your_generated_token
+
+# 方式 3: PaaS 平台控制面板添加环境变量
 ```
 
 如果不设置，系统会自动生成一个随机 token。
@@ -298,9 +292,10 @@ fly secrets set WEBHOOK_SECRET_TOKEN=your_generated_token -a your-app-name
 Telegram 要求 Webhook URL 必须是 HTTPS。
 
 **获取 HTTPS 证书**:
-- **PaaS 平台**: 通常自动提供（Fly.io、Heroku、Railway 等）
-- **VPS**: 使用 Let's Encrypt 或 Caddy 自动配置
-- **Nginx**: 配合 Certbot 获取免费证书
+- **PaaS 平台**: 通常自动提供 SSL 证书
+- **VPS + Caddy**: 自动申请和续期 Let's Encrypt 证书
+- **VPS + Nginx**: 使用 Certbot 获取 Let's Encrypt 免费证书
+- **Cloudflare**: 免费 SSL/TLS 加密（适合任何服务器）
 
 ---
 
@@ -336,12 +331,13 @@ Status: 稳定运行
 
 **解决方法**：
 ```bash
-# 检查环境变量
-fly ssh console -a your-app-name
+# 检查环境变量（通过平台控制面板或 SSH）
 env | grep WEBHOOK
 
 # 确保设置了 WEBHOOK_URL
-fly secrets set WEBHOOK_URL=https://your-app.fly.dev -a your-app-name
+# 方式 1: 修改 config.ini
+# 方式 2: 在平台控制面板添加环境变量
+# 方式 3: 使用平台 CLI 设置
 ```
 
 ### 2. 收不到消息
@@ -359,21 +355,21 @@ curl "https://api.telegram.org/bot<YOUR_TOKEN>/getWebhookInfo"
 应该返回：
 ```json
 {
-  "url": "https://your-app.fly.dev/webhook",
+  "url": "https://your-domain.com/webhook",
   "has_custom_certificate": false,
   "pending_update_count": 0,
   "max_connections": 40
 }
 ```
 
-2. **检查日志**：
-```bash
-fly logs -a your-app-name
-```
+2. **检查应用日志**：
+   - PaaS 平台：在控制面板查看日志
+   - VPS：`tail -f /app/logs/app.log`
+   - Docker：`docker logs container-name`
 
 3. **测试健康检查**：
 ```bash
-curl https://your-app.fly.dev/health
+curl https://your-domain.com/health
 # 应该返回: OK
 ```
 
@@ -390,14 +386,18 @@ PORT = 8081
 ```
 
 **注意**：如果使用配置文件部署，也需要更新相应端口：
-```toml
-# 示例：fly.toml (Fly.io)
-[[services]]
-  internal_port = 8081
 
-# 示例：docker-compose.yml
+```yaml
+# Docker Compose
 ports:
   - "8081:8081"
+```
+
+```nginx
+# Nginx 反向代理
+location /webhook {
+    proxy_pass http://localhost:8081;
+}
 ```
 
 ---
