@@ -448,6 +448,10 @@ async def get_my_posts(update: Update, context: CallbackContext):
     is_owner = (user_id == OWNER_ID)
     
     try:
+        # 支持从消息或回调两种入口回复
+        reply_target = update.message if getattr(update, 'message', None) else (
+            update.callback_query.message if getattr(update, 'callback_query', None) else None
+        )
         # 解析参数
         limit = 10
         if context.args and context.args[0].isdigit():
@@ -464,14 +468,14 @@ async def get_my_posts(update: Update, context: CallbackContext):
             user_posts = await cursor.fetchall()
         
         if not user_posts:
-            await update.message.reply_text(
+            await reply_target.reply_text(
                 "📝 您还没有发布过投稿\n\n"
                 "使用 /submit 开始创建您的第一篇投稿！"
             )
             return
         
         # 逐条发送帖子，每个帖子带操作按钮
-        await update.message.reply_text(
+        await reply_target.reply_text(
             f"📝 我的投稿（最近 {len(user_posts)} 篇）\n\n"
             f"{'💡 提示：作为管理员，您可以直接删除帖子' if is_owner else '💡 提示：点击按钮查看帖子详情'}"
         )
@@ -524,7 +528,7 @@ async def get_my_posts(update: Update, context: CallbackContext):
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             # 发送单个帖子信息
-            await update.message.reply_text(
+            await reply_target.reply_text(
                 message,
                 reply_markup=reply_markup,
                 disable_web_page_preview=True
@@ -532,17 +536,20 @@ async def get_my_posts(update: Update, context: CallbackContext):
             
             # 防止消息过多，最多显示前20篇
             if idx >= 20:
-                await update.message.reply_text(
+                await reply_target.reply_text(
                     f"...\n\n还有更多投稿，使用 /myposts {limit + 10} 查看更多"
                 )
                 break
         
         # 最后发送统计提示
-        await update.message.reply_text("💡 使用 /mystats 查看完整统计")
+        await reply_target.reply_text("💡 使用 /mystats 查看完整统计")
         
     except Exception as e:
-        logger.error(f"获取用户帖子失败: {e}")
-        await update.message.reply_text("❌ 获取帖子列表失败，请稍后重试")
+        logger.error(f"获取用户帖子失败: {e}", exc_info=True)
+        try:
+            await reply_target.reply_text("❌ 获取帖子列表失败，请稍后重试")
+        except Exception:
+            pass
 
 
 async def search_by_user(update: Update, context: CallbackContext):

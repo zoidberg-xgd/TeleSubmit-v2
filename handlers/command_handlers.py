@@ -48,6 +48,32 @@ async def cancel(update: Update, context: CallbackContext) -> int:
     await update.message.reply_text("❌ 投稿已取消", reply_markup=ReplyKeyboardRemove())
     return ConversationHandler.END
 
+
+async def cancel_callback(update: Update, context: CallbackContext) -> int:
+    """处理回调按钮触发的取消动作，兼容内联键盘。"""
+    logger.info(f"收到回调取消操作，user_id: {update.effective_user.id}")
+    query = update.callback_query
+    user_id = update.effective_user.id
+    try:
+        async with get_db() as conn:
+            c = await conn.cursor()
+            await c.execute("DELETE FROM submissions WHERE user_id=?", (user_id,))
+    except Exception as e:
+        logger.error(f"取消(回调)时删除数据错误: {e}")
+    try:
+        await query.answer("已取消")
+    except Exception:
+        pass
+    try:
+        await query.edit_message_text("❌ 投稿已取消")
+    except Exception:
+        # 如果编辑失败，改为新发一条消息
+        try:
+            await query.message.reply_text("❌ 投稿已取消")
+        except Exception:
+            pass
+    return ConversationHandler.END
+
 async def help_command(update: Update, context: CallbackContext):
     """
     帮助命令，显示机器人使用说明
@@ -123,6 +149,11 @@ async def handle_menu_shortcuts(update: Update, context: CallbackContext) -> Non
     """处理底部菜单（ReplyKeyboard）文本，映射到实际命令。"""
     text = (update.message.text or "").strip()
     try:
+        # 如果处于搜索输入模式，优先交给搜索输入处理
+        if context.user_data.get('search_mode'):
+            from handlers.search_handlers import handle_search_input
+            await handle_search_input(update, context)
+            return
         # 开始投稿
         if text.endswith("开始投稿"):
             from handlers.mode_selection import submit
