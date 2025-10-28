@@ -10,10 +10,12 @@
 | `install.sh` | 一键安装向导 | 首次部署 |
 | `deploy.sh` | Docker 部署 | 首次部署 |
 | `start.sh` | 启动机器人 | 日常使用 |
-| `restart.sh` | 重启机器人 | 日常使用 |
+| `restart.sh` | 重启机器人 | 日常使用 ⭐ |
 | `update.sh` | 拉取更新 | 定期维护 |
 | `upgrade.sh` | 功能升级 | 版本升级 |
 | `uninstall.sh` | 卸载程序 | 移除服务 |
+
+> **v2.1+ 新特性**: 修改配置后使用 `restart.sh` 即可自动完成分词器切换和索引重建！
 
 ## 首次部署
 
@@ -325,6 +327,46 @@ cp -r ~/uninstall_*/data .
 ```bash
 ./deploy.sh --rebuild  # 强制重建镜像
 ```
+
+### 场景 7：切换分词器（v2.1+）⭐
+
+**从 simple 切换到 jieba（高质量中文分词）**:
+```bash
+# 1. 编辑 requirements.txt
+# 取消注释: jieba>=0.42.1
+nano requirements.txt
+
+# 2. 安装 jieba
+pip install jieba>=0.42.1
+
+# 3. 修改配置
+nano config.ini
+# 设置: [SEARCH] ANALYZER = jieba
+
+# 4. 重启（自动完成索引重建）
+./restart.sh
+```
+
+**从 jieba 切换到 simple（节省 ~140MB 内存）**:
+```bash
+# 1. 修改配置
+nano config.ini
+# 设置: [SEARCH] ANALYZER = simple
+
+# 2. 重启（自动完成索引重建）
+./restart.sh
+
+# 3. 可选：卸载 jieba 节省空间
+pip uninstall jieba -y
+```
+
+**自动适配说明**:
+- ✅ v2.1+ 版本会自动检测分词器变化
+- ✅ 自动备份旧索引到 `data/search_index.backup`
+- ✅ 自动创建新索引并重新索引所有帖子
+- ✅ 失败时自动回滚，不影响其他功能
+
+详见 [内存优化指南](MEMORY_USAGE.md)
 
 ## 脚本维护
 
