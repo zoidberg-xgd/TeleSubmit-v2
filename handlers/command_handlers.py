@@ -38,19 +38,23 @@ async def cancel(update: Update, context: CallbackContext) -> int:
     """
     logger.info(f"收到 /cancel 命令，user_id: {update.effective_user.id}")
     user_id = update.effective_user.id
+    session_exists = False
     try:
         async with get_db() as conn:
             c = await conn.cursor()
+            await c.execute("SELECT 1 FROM submissions WHERE user_id=?", (user_id,))
+            session_exists = await c.fetchone() is not None
             await c.execute("DELETE FROM submissions WHERE user_id=?", (user_id,))
     except Exception as e:
         logger.error(f"取消时删除数据错误: {e}")
-    # 清除键盘，避免残留旧按钮
+    # 根据是否存在会话给出不同提示
+    message_text = "❌ 投稿已取消" if session_exists else "ℹ️ 当前没有进行中的投稿"
     try:
-        await update.message.reply_text("❌ 投稿已取消", reply_markup=ReplyKeyboardRemove())
+        await update.message.reply_text(message_text, reply_markup=ReplyKeyboardRemove())
     except Exception:
         # 在极少数情况下 message 可能不存在
         try:
-            await context.bot.send_message(chat_id=update.effective_chat.id, text="❌ 投稿已取消")
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=message_text)
         except Exception:
             pass
     return ConversationHandler.END
@@ -160,10 +164,6 @@ async def handle_menu_shortcuts(update: Update, context: CallbackContext) -> Non
         if context.user_data.get('search_mode'):
             from handlers.search_handlers import handle_search_input
             await handle_search_input(update, context)
-            return
-        # 任何时候文本里出现“取消”都执行取消
-        if "取消" in text:
-            await cancel(update, context)
             return
         # 开始投稿
         if text.endswith("开始投稿"):
