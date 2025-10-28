@@ -7,6 +7,44 @@
 
 ---
 
+## [Unreleased]
+
+### 新增
+
+- **Webhook 模式支持** 🌐 ⭐
+  - 新增 Webhook 运行模式，与 Polling 模式并存
+  - 支持通过配置文件或环境变量切换模式
+  - 响应速度更快（<1秒），资源消耗更低
+  - 适用于生产环境和云服务器部署
+  - 内置 Secret Token 验证机制
+  - 支持多种部署方式（VPS、Docker、PaaS 平台）
+
+- **安装脚本增强**
+  - `install.sh` 新增运行模式选择向导
+  - 自动引导用户选择 Polling 或 Webhook 模式
+  - Webhook 模式自动验证 URL 格式
+  - 配置完成后显示摘要信息
+
+### 文档
+
+- 新增 `docs/WEBHOOK_MODE.md` - Webhook 模式完整指南
+  - 两种模式详细对比
+  - 多种部署方式示例（通用/Docker/PaaS）
+  - 模式切换步骤说明
+  - 故障排查指南
+- `README.md` 新增运行模式章节
+- `SCRIPTS_GUIDE.md` 计划更新（待添加）
+
+### 技术细节
+
+- 新增 `utils/webhook_server.py` - Webhook 服务器模块
+- 更新 `config/settings.py` - 支持 Webhook 配置项
+- 更新 `main.py` - 双模式启动逻辑
+- 新增依赖：`aiohttp>=3.9.0`（用于 Webhook）
+- 新增配置项：`RUN_MODE`、`WEBHOOK_URL`、`WEBHOOK_PORT`、`WEBHOOK_PATH`、`WEBHOOK_SECRET_TOKEN`
+
+---
+
 ## [2.1.0] - 2025-10-28
 
 ### 新增

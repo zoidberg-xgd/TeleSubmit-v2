@@ -81,6 +81,15 @@ BOT_MODE = os.getenv('BOT_MODE') or get_config('BOT', 'BOT_MODE', fallback='MIXE
 # 允许的文件类型配置
 ALLOWED_FILE_TYPES = os.getenv('ALLOWED_FILE_TYPES') or get_config('BOT', 'ALLOWED_FILE_TYPES', fallback='*')
 
+# 运行模式配置
+RUN_MODE = (os.getenv('RUN_MODE') or get_config('BOT', 'RUN_MODE', fallback='POLLING')).strip().upper()
+
+# Webhook 配置（仅当 RUN_MODE = WEBHOOK 时生效）
+WEBHOOK_URL = os.getenv('WEBHOOK_URL') or get_config('WEBHOOK', 'URL', fallback='')
+WEBHOOK_PORT = int(os.getenv('WEBHOOK_PORT', get_config_int('WEBHOOK', 'PORT', 8080)))
+WEBHOOK_PATH = os.getenv('WEBHOOK_PATH') or get_config('WEBHOOK', 'PATH', fallback='/webhook')
+WEBHOOK_SECRET_TOKEN = os.getenv('WEBHOOK_SECRET_TOKEN') or get_config('WEBHOOK', 'SECRET_TOKEN', fallback='')
+
 # 搜索引擎配置
 SEARCH_INDEX_DIR = os.getenv('SEARCH_INDEX_DIR') or get_config('SEARCH', 'INDEX_DIR', fallback='data/search_index')
 SEARCH_ENABLED = os.getenv('SEARCH_ENABLED', str(get_config_bool('SEARCH', 'ENABLED', True))).lower() in ('true', '1', 'yes')
@@ -104,12 +113,18 @@ MODE_MIXED = 'MIXED'      # 混合模式
 # 打印配置信息（调试用）
 logger.info(f"配置加载完成:")
 logger.info(f"  - BOT_MODE: {BOT_MODE}")
+logger.info(f"  - RUN_MODE: {RUN_MODE}")
 logger.info(f"  - CHANNEL_ID: {CHANNEL_ID}")
 logger.info(f"  - DB_PATH: {DB_PATH}")
 logger.info(f"  - TIMEOUT: {TIMEOUT}")
 logger.info(f"  - OWNER_ID: {OWNER_ID if OWNER_ID else '未设置'}")
 logger.info(f"  - ADMIN_IDS: {ADMIN_IDS if ADMIN_IDS else '未设置'}")
 logger.info(f"  - ALLOWED_FILE_TYPES: {ALLOWED_FILE_TYPES}")
+if RUN_MODE == 'WEBHOOK':
+    logger.info(f"  - WEBHOOK_URL: {WEBHOOK_URL if WEBHOOK_URL else '未设置'}")
+    logger.info(f"  - WEBHOOK_PORT: {WEBHOOK_PORT}")
+    logger.info(f"  - WEBHOOK_PATH: {WEBHOOK_PATH}")
+    logger.info(f"  - WEBHOOK_SECRET: {'已设置' if WEBHOOK_SECRET_TOKEN else '未设置（将自动生成）'}")
 logger.info(f"  - SEARCH_INDEX_DIR: {SEARCH_INDEX_DIR}")
 logger.info(f"  - SEARCH_ENABLED: {SEARCH_ENABLED}")
 logger.info(f"  - SEARCH_ANALYZER: {SEARCH_ANALYZER}")
