@@ -599,12 +599,9 @@ async def handle_back_to_main(update: Update, context: CallbackContext):
         parse_mode=ParseMode.HTML,
         reply_markup=None
     )
-    # 追加发送对应菜单（管理员显示管理员菜单，普通用户显示主菜单）
+    # 统一返回主菜单（不再显示管理员菜单提示文案）
     try:
-        if is_admin:
-            await query.message.reply_text("👑 管理员菜单：", reply_markup=Keyboards.admin_menu())
-        else:
-            await query.message.reply_text("主菜单：", reply_markup=Keyboards.main_menu())
+        await query.message.reply_text("主菜单：", reply_markup=Keyboards.main_menu())
     except Exception:
         pass
 
