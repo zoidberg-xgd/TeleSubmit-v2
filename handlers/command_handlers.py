@@ -19,6 +19,8 @@ from utils.blacklist import (
     _blacklist
 )
 from config.settings import OWNER_ID, NOTIFY_OWNER, TIMEOUT
+from ui.keyboards import Keyboards
+from ui.messages import MessageFormatter
 from utils.database import get_user_state, get_all_user_states
 
 logger = logging.getLogger(__name__)
@@ -115,6 +117,54 @@ async def help_command(update: Update, context: CallbackContext):
 
 
 # 管理面板相关功能已移除
+
+
+async def handle_menu_shortcuts(update: Update, context: CallbackContext) -> None:
+    """处理底部菜单（ReplyKeyboard）文本，映射到实际命令。"""
+    text = (update.message.text or "").strip()
+    try:
+        # 开始投稿
+        if text.endswith("开始投稿"):
+            from handlers.mode_selection import submit
+            await submit(update, context)
+            return
+        # 我的统计
+        if text.endswith("我的统计"):
+            from handlers.stats_handlers import get_user_stats
+            await get_user_stats(update, context)
+            return
+        # 我的投稿
+        if text.endswith("我的投稿"):
+            from handlers.search_handlers import get_my_posts
+            await get_my_posts(update, context)
+            return
+        # 热门内容
+        if text.endswith("热门内容"):
+            from handlers.stats_handlers import get_hot_posts
+            await get_hot_posts(update, context)
+            return
+        # 标签云
+        if text.endswith("标签云"):
+            from handlers.search_handlers import get_tag_cloud
+            await get_tag_cloud(update, context)
+            return
+        # 搜索
+        if text.endswith("搜索"):
+            await update.message.reply_text(
+                "🔍 请输入搜索关键词，或点击下方选项：",
+                reply_markup=Keyboards.search_options()
+            )
+            return
+        # 帮助
+        if text.endswith("帮助"):
+            await help_command(update, context)
+            return
+        # 关于
+        if text.endswith("关于"):
+            await update.message.reply_text(MessageFormatter.about_message(), parse_mode="HTML")
+            return
+    except Exception as e:
+        logger.error(f"处理菜单快捷操作失败: {e}")
 
 
 async def settings(update: Update, context: CallbackContext):

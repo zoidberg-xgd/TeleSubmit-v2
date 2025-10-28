@@ -50,7 +50,7 @@ from handlers import (
 
 # 黑名单管理
 from utils.blacklist import manage_blacklist, init_blacklist, blacklist_filter
-from handlers.command_handlers import blacklist_add, blacklist_remove, blacklist_list, catch_all, debug
+from handlers.command_handlers import blacklist_add, blacklist_remove, blacklist_list, catch_all, debug, handle_menu_shortcuts
 
 # 投稿处理
 from handlers.publish import publish_submission
@@ -462,6 +462,8 @@ def setup_application(application):
     except Exception as e:
         logger.error(f"设置定期任务失败: {e}", exc_info=True)
     
+    # 将底部菜单文本映射到命令（在最低优先级前处理）
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_menu_shortcuts), group=998)
     # 添加未处理消息的捕获处理器 (最低优先级组)
     application.add_handler(MessageHandler(filters.ALL, catch_all), group=999)
     
