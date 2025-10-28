@@ -16,7 +16,7 @@ from utils.cache import TTLCache
 logger = logging.getLogger(__name__)
 
 # 简单缓存：标签云 60s
-_tag_cloud_cache = TTLCache(default_ttl=60, max_size=32)
+_tag_cloud_cache = TTLCache(default_ttl=60, max_size=16)
 
 
 def is_owner(user_id: int) -> bool:

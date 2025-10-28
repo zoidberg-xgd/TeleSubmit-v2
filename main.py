@@ -458,8 +458,8 @@ def setup_application(application):
         # 每天凌晨3点执行一次日志清理
         job_queue.run_daily(clean_logs_job, time=datetime_time(hour=3, minute=0))
         
-        # 添加帖子统计数据更新任务（每小时执行一次）
-        job_queue.run_repeating(update_post_stats, interval=3600, first=60)
+        # 添加帖子统计数据更新任务（默认每2小时执行一次，降低峰值）
+        job_queue.run_repeating(update_post_stats, interval=7200, first=60)
         logger.info("定期任务设置完成（包括统计数据更新）")
     except Exception as e:
         logger.error(f"设置定期任务失败: {e}", exc_info=True)

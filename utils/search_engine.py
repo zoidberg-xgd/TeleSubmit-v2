@@ -14,29 +14,44 @@ from whoosh.qparser import QueryParser, MultifieldParser
 from whoosh.writing import IndexWriter
 from whoosh.query import Term, Or, DateRange, NumericRange, And
 import whoosh.highlight as highlight
-from jieba.analyse.analyzer import ChineseAnalyzer
+from config.settings import SEARCH_ANALYZER, SEARCH_HIGHLIGHT
 
 logger = logging.getLogger(__name__)
 
 
 class PostDocument:
     """搜索文档数据结构"""
-    
-    # 定义 Whoosh 索引结构
-    schema = Schema(
-        message_id=ID(stored=True, unique=True),
-        post_id=NUMERIC(stored=True),  # 数据库ID，用于删除操作
-        title=TEXT(stored=True, analyzer=ChineseAnalyzer()),
-        description=TEXT(stored=True, analyzer=ChineseAnalyzer()),
-        tags=TEXT(stored=True, analyzer=ChineseAnalyzer()),
-        filename=TEXT(stored=True, analyzer=ChineseAnalyzer()),
-        link=TEXT(stored=True),
-        user_id=ID(stored=True),  # 使用 ID 类型支持大整数
-        username=TEXT(stored=True),
-        publish_time=DATETIME(stored=True, sortable=True),
-        views=NUMERIC(stored=True),
-        heat_score=NUMERIC(stored=True, sortable=True),
-    )
+
+    @staticmethod
+    def get_schema() -> Schema:
+        """按配置懒加载构建 Schema，避免在导入时加载大词典。"""
+        analyzer = None
+        if SEARCH_ANALYZER == 'jieba':
+            try:
+                from jieba.analyse.analyzer import ChineseAnalyzer  # 延迟导入
+                analyzer = ChineseAnalyzer()
+            except Exception:
+                # 回退到简单分词器
+                from whoosh.analysis import SimpleAnalyzer
+                analyzer = SimpleAnalyzer()
+        else:
+            from whoosh.analysis import SimpleAnalyzer
+            analyzer = SimpleAnalyzer()
+
+        return Schema(
+            message_id=ID(stored=True, unique=True),
+            post_id=NUMERIC(stored=True),  # 数据库ID，用于删除操作
+            title=TEXT(stored=True, analyzer=analyzer),
+            description=TEXT(stored=False, analyzer=analyzer),  # 仅用于检索，不存储
+            tags=TEXT(stored=True, analyzer=analyzer),
+            filename=TEXT(stored=True, analyzer=analyzer),
+            link=TEXT(stored=False),      # 不展示，不存储
+            user_id=ID(stored=True),
+            username=TEXT(stored=False),  # 不展示，不存储
+            publish_time=DATETIME(stored=True, sortable=True),
+            views=NUMERIC(stored=True),
+            heat_score=NUMERIC(stored=True, sortable=True),
+        )
     
     def __init__(self, message_id: int, title: str = "", description: str = "", 
                  tags: str = "", filename: str = "", link: str = "", user_id: int = 0, 
@@ -122,6 +137,7 @@ class PostSearchEngine:
         """
         self.index_dir = Path(index_dir)
         self.index_name = 'posts'
+        self.enable_highlight = SEARCH_HIGHLIGHT
         
         # 创建索引目录
         if not self.index_dir.exists():
@@ -138,21 +154,24 @@ class PostSearchEngine:
             self.ix = index.open_dir(str(self.index_dir), self.index_name)
             logger.info(f"打开现有索引: {self.index_dir}")
         else:
-            self.ix = index.create_in(str(self.index_dir), PostDocument.schema, self.index_name)
+            self.ix = index.create_in(str(self.index_dir), PostDocument.get_schema(), self.index_name)
             logger.info(f"创建新索引: {self.index_dir}")
         
         # 创建查询解析器（支持多字段搜索）
+        # 使用索引中的 schema 创建解析器
         self.query_parser = MultifieldParser(
             ['title', 'description', 'tags', 'filename'],
-            schema=PostDocument.schema
+            schema=self.ix.schema
         )
         
-        # 创建高亮器
-        # 降低高亮器开销：更短片段，减少内存占用
-        self.highlighter = highlight.Highlighter(
-            fragmenter=highlight.ContextFragmenter(maxchars=200, surround=50),
-            formatter=highlight.HtmlFormatter()
-        )
+        # 创建高亮器（可配置关闭）
+        if self.enable_highlight:
+            self.highlighter = highlight.Highlighter(
+                fragmenter=highlight.ContextFragmenter(maxchars=200, surround=50),
+                formatter=highlight.HtmlFormatter()
+            )
+        else:
+            self.highlighter = None
     
     def add_post(self, post: PostDocument, writer: Optional[IndexWriter] = None):
         """
@@ -255,14 +274,17 @@ class PostSearchEngine:
                 # 构建结果
                 hits = []
                 for hit in result_page:
-                    # 高亮显示
-                    highlighted_title = self.highlighter.highlight_hit(hit, 'title') or hit.get('title', '')
-                    highlighted_desc = self.highlighter.highlight_hit(hit, 'description') or hit.get('description', '')
+                    # 可选高亮
+                    if self.highlighter is not None:
+                        highlighted_title = self.highlighter.highlight_hit(hit, 'title') or hit.get('title', '')
+                        highlighted_desc = self.highlighter.highlight_hit(hit, 'description') or hit.get('description', '')
+                    else:
+                        highlighted_title = hit.get('title', '')
+                        highlighted_desc = hit.get('description', '')
                     
                     # 检测匹配字段
                     matched_fields = []
                     if query_str.strip():
-                        # 简单检查：看看查询词是否在各个字段中
                         query_lower = query_str.lower()
                         if hit.get('title', '').lower().find(query_lower) != -1:
                             matched_fields.append('标题')
@@ -322,7 +344,7 @@ class PostSearchEngine:
         if self.index_dir.exists():
             shutil.rmtree(self.index_dir)
             self.index_dir.mkdir(parents=True)
-            self.ix = index.create_in(str(self.index_dir), PostDocument.schema, self.index_name)
+            self.ix = index.create_in(str(self.index_dir), PostDocument.get_schema(), self.index_name)
             logger.info("索引已清空")
     
     def is_empty(self) -> bool:

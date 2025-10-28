@@ -30,18 +30,25 @@ NOTIFY_OWNER = true
 # 机器人模式: MEDIA (仅媒体), DOCUMENT (仅文档), MIXED (混合模式)
 BOT_MODE = MIXED
 
-# 允许上传的文档文件类型（MIME类型或文件扩展名，逗号分隔）
-# 留空或设为 * 表示允许所有类型
-# 示例1 - 小说类: ALLOWED_FILE_TYPES = .txt,.epub,.mobi,.azw3,.pdf
-# 示例2 - 压缩包: ALLOWED_FILE_TYPES = .zip,.rar,.7z,.tar,.gz
-# 示例3 - Office文档: ALLOWED_FILE_TYPES = .doc,.docx,.xls,.xlsx,.ppt,.pptx,.pdf
-# 示例4 - 使用MIME类型: ALLOWED_FILE_TYPES = application/pdf,application/zip
-# 示例5 - 允许所有: ALLOWED_FILE_TYPES = *
+# 允许的文档类型（扩展名或MIME，逗号分隔），留空或 * 表示允许所有
 ALLOWED_FILE_TYPES = *
 
 [SEARCH]
 # 搜索索引目录
 INDEX_DIR = data/search_index
 
-# 是否启用搜索功能
+# 是否启用搜索
 ENABLED = true
+
+# 分词器：jieba | simple
+# - jieba: 中文分词效果更好，但占用 ~20MB 词典内存
+# - simple: 内存占用更低（推荐内存受限环境）
+ANALYZER = jieba
+
+# 搜索结果高亮：true|false（关闭可进一步减少开销）
+HIGHLIGHT = false
+
+[DB]
+# SQLite page cache 大小（KB），影响内存占用
+# 内存受限可设 1024（1MB），通常 1024~4096 即可
+CACHE_SIZE_KB = 1024

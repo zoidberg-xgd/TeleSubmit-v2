@@ -139,3 +139,4 @@ analyze_memory.py
 .coverage
 htmlcov/
 .last_backup
+config.ini.backup.*

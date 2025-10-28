@@ -84,6 +84,11 @@ ALLOWED_FILE_TYPES = os.getenv('ALLOWED_FILE_TYPES') or get_config('BOT', 'ALLOW
 # 搜索引擎配置
 SEARCH_INDEX_DIR = os.getenv('SEARCH_INDEX_DIR') or get_config('SEARCH', 'INDEX_DIR', fallback='data/search_index')
 SEARCH_ENABLED = os.getenv('SEARCH_ENABLED', str(get_config_bool('SEARCH', 'ENABLED', True))).lower() in ('true', '1', 'yes')
+SEARCH_ANALYZER = (os.getenv('SEARCH_ANALYZER') or get_config('SEARCH', 'ANALYZER', fallback='jieba')).strip().lower()
+SEARCH_HIGHLIGHT = os.getenv('SEARCH_HIGHLIGHT', str(get_config_bool('SEARCH', 'HIGHLIGHT', False))).lower() in ('true', '1', 'yes')
+
+# 数据库配置
+DB_CACHE_KB = int(os.getenv('DB_CACHE_KB', get_config_int('DB', 'CACHE_SIZE_KB', 4096)))  # SQLite page cache，单位KB
 
 # 验证必要配置
 if not TOKEN:
@@ -107,3 +112,6 @@ logger.info(f"  - ADMIN_IDS: {ADMIN_IDS if ADMIN_IDS else '未设置'}")
 logger.info(f"  - ALLOWED_FILE_TYPES: {ALLOWED_FILE_TYPES}")
 logger.info(f"  - SEARCH_INDEX_DIR: {SEARCH_INDEX_DIR}")
 logger.info(f"  - SEARCH_ENABLED: {SEARCH_ENABLED}")
+logger.info(f"  - SEARCH_ANALYZER: {SEARCH_ANALYZER}")
+logger.info(f"  - SEARCH_HIGHLIGHT: {SEARCH_HIGHLIGHT}")
+logger.info(f"  - DB_CACHE_KB: {DB_CACHE_KB}")

@@ -13,6 +13,7 @@ Telegram 频道投稿机器人，支持媒体上传、全文搜索、热度统�
 ## 系统要求
 
 - **内存**: 256 MB - 1 GB（取决于频道规模）
+  - 优化后可低至 80-120 MB（见 [内存优化](#内存优化)）
 - **磁盘**: 100 MB 以上
 - **Python**: 3.9+（推荐 3.11）
 
@@ -303,6 +304,27 @@ TeleSubmit-v2/
 - Docker：>= 20.10
 - Docker Compose：>= 2.0
 - 内存：>= 512 MB（容器限制）
+
+## 内存优化
+
+### 一键优化（推荐）
+
+```bash
+./optimize_memory.sh  # 内存从 ~250 MB 降至 ~80-120 MB
+```
+
+### 模式切换
+
+```bash
+./switch_mode.sh minimal      # 极致省内存 (~80-120 MB)
+./switch_mode.sh balanced     # 均衡模式 (~150-200 MB) 推荐
+./switch_mode.sh performance  # 性能优先 (~200-350 MB)
+./switch_mode.sh nosearch     # 禁用搜索 (~60-100 MB)
+```
+
+详见 [MEMORY_USAGE.md](MEMORY_USAGE.md)
+
+---
 
 ## 文档
 

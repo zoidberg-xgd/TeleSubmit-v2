@@ -314,6 +314,50 @@ async def debug(update: Update, context: CallbackContext):
             logger.warning(f"获取系统信息失败: {e}")
             debug_info += "\n⚠️ 无法获取系统信息"
         
+        # 搜索/数据库配置与索引统计
+        try:
+            from config.settings import (
+                SEARCH_ENABLED, SEARCH_ANALYZER, SEARCH_HIGHLIGHT, SEARCH_INDEX_DIR, DB_CACHE_KB
+            )
+            search_info = (
+                "\n🔎 **搜索/数据库配置**\n\n"
+                f"🔍 搜索启用: {SEARCH_ENABLED}\n"
+                f"🧩 分词器: {SEARCH_ANALYZER}\n"
+                f"✨ 高亮: {SEARCH_HIGHLIGHT}\n"
+                f"📁 索引目录: `{SEARCH_INDEX_DIR}`\n"
+                f"🗃️ SQLite page cache: {DB_CACHE_KB} KB\n"
+            )
+            # 目录大小
+            try:
+                import os
+                def _dir_size_bytes(path: str) -> int:
+                    total = 0
+                    for root, _, files in os.walk(path):
+                        for name in files:
+                            fp = os.path.join(root, name)
+                            try:
+                                total += os.path.getsize(fp)
+                            except Exception:
+                                pass
+                    return total
+                idx_bytes = _dir_size_bytes(SEARCH_INDEX_DIR)
+                search_info += f"📦 索引大小: {idx_bytes/1024/1024:.2f} MB\n"
+            except Exception:
+                pass
+            # 索引文档统计
+            try:
+                from utils.search_engine import get_search_engine
+                se = get_search_engine()
+                stats = se.get_stats()
+                search_info += f"📄 索引文档数: {stats.get('total_docs','N/A')}\n"
+            except Exception as se_err:
+                search_info += f"📄 索引文档数: N/A ({se_err})\n"
+
+            debug_info += search_info
+        except Exception as e:
+            logger.warning(f"获取搜索/数据库配置失败: {e}")
+            debug_info += "\n⚠️ 无法获取搜索/数据库配置"
+
         try:
             # 尝试使用Markdown格式发送
             await update.message.reply_text(debug_info, parse_mode="Markdown")
