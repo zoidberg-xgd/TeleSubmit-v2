@@ -101,6 +101,14 @@ setup_logging()
 # 加载环境变量
 load_dotenv()
 
+# 健康检查服务器（用于 Fly.io 部署）
+try:
+    from health import start_health_server
+    HEALTH_SERVER_ENABLED = True
+except ImportError:
+    HEALTH_SERVER_ENABLED = False
+    logger.warning("health.py 未找到，健康检查服务器将不会启动")
+
 # 全局变量
 TIMEOUT_SECONDS = int(os.getenv("SESSION_TIMEOUT", "900"))  # 默认15分钟
 
@@ -219,6 +227,14 @@ async def main():
     logger.info(f"启动TeleSubmit机器人。版本: {CONFIG.get('VERSION', '0.1.0')}")
     logger.info(f"会话超时时间: {TIMEOUT_SECONDS}秒")
     
+    # 启动健康检查服务器（用于 Fly.io 部署）
+    if HEALTH_SERVER_ENABLED:
+        try:
+            start_health_server(port=8080)
+            logger.info("健康检查服务器已启动")
+        except Exception as e:
+            logger.warning(f"启动健康检查服务器失败: {e}")
+    
     # 初始化数据库
     await init_db()
     # 初始化用户会话数据库
@@ -231,32 +247,50 @@ async def main():
     try:
         from config.settings import SEARCH_INDEX_DIR, SEARCH_ENABLED
         if SEARCH_ENABLED:
-            init_search_engine(index_dir=SEARCH_INDEX_DIR, from_scratch=False)
+            # 初始化搜索引擎（内置兼容性检查和自动重建）
+            from utils.search_engine import get_search_engine
+            search_engine = init_search_engine(index_dir=SEARCH_INDEX_DIR, from_scratch=False)
             logger.info(f"搜索引擎初始化完成，索引目录: {SEARCH_INDEX_DIR}")
             
-            # 自动检查并修复索引
-            logger.info("正在检查搜索索引...")
-            try:
-                result = await auto_rebuild_index_if_needed()
-                if result["action"] == "sync":
-                    sync_result = result["result"]
-                    if sync_result["success"]:
-                        logger.info(f"✅ 索引已自动同步: 添加 {sync_result['added']} 个, 删除 {sync_result['removed']} 个")
+            # 检查是否需要重新索引
+            if hasattr(search_engine, '_needs_reindex') and search_engine._needs_reindex:
+                logger.warning("检测到索引已重建，需要重新索引所有帖子")
+                logger.info("正在从数据库重新索引...")
+                try:
+                    result = await auto_rebuild_index_if_needed()
+                    if result.get("success") or (result.get("result") and result["result"].get("success")):
+                        logger.info(f"✅ 索引重建成功！")
+                        # 清除重建标记
+                        search_engine._needs_reindex = False
                     else:
-                        logger.warning(f"⚠️ 索引同步部分失败: {sync_result.get('errors', [])}")
-                elif result["action"] == "rebuild":
-                    rebuild_result = result["result"]
-                    if rebuild_result["success"]:
-                        logger.info(f"✅ 索引已自动重建: 成功 {rebuild_result['added']} 个, 失败 {rebuild_result['failed']} 个 (原因: {result.get('reason', '未知')})")
+                        logger.warning(f"⚠️ 索引重建未完全成功，搜索功能可能受限")
+                except Exception as rebuild_err:
+                    logger.error(f"自动重建索引失败: {rebuild_err}", exc_info=True)
+                    logger.warning("搜索功能可能不可用，请手动执行 /rebuild_index")
+            else:
+                # 正常的索引检查和同步
+                logger.info("正在检查搜索索引...")
+                try:
+                    result = await auto_rebuild_index_if_needed()
+                    if result["action"] == "sync":
+                        sync_result = result["result"]
+                        if sync_result["success"]:
+                            logger.info(f"✅ 索引已自动同步: 添加 {sync_result['added']} 个, 删除 {sync_result['removed']} 个")
+                        else:
+                            logger.warning(f"⚠️ 索引同步部分失败: {sync_result.get('errors', [])}")
+                    elif result["action"] == "rebuild":
+                        rebuild_result = result["result"]
+                        if rebuild_result["success"]:
+                            logger.info(f"✅ 索引已自动重建: 成功 {rebuild_result['added']} 个, 失败 {rebuild_result['failed']} 个 (原因: {result.get('reason', '未知')})")
+                        else:
+                            logger.warning(f"⚠️ 索引重建失败: {rebuild_result.get('errors', [])}")
+                    elif result["action"] == "none":
+                        logger.info(f"✅ {result['reason']}")
                     else:
-                        logger.warning(f"⚠️ 索引重建失败: {rebuild_result.get('errors', [])}")
-                elif result["action"] == "none":
-                    logger.info(f"✅ {result['reason']}")
-                else:
-                    logger.warning(f"⚠️ 索引检查失败: {result.get('reason', '未知原因')}")
-            except Exception as idx_err:
-                logger.error(f"索引检查失败: {idx_err}", exc_info=True)
-                logger.warning("将继续运行，但索引可能不准确")
+                        logger.warning(f"⚠️ 索引检查失败: {result.get('reason', '未知原因')}")
+                except Exception as idx_err:
+                    logger.error(f"索引检查失败: {idx_err}", exc_info=True)
+                    logger.warning("将继续运行，但索引可能不准确")
         else:
             logger.info("搜索功能已禁用")
     except Exception as e:

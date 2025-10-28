@@ -13,4 +13,4 @@ psutil==5.9.8
 
 # 搜索引擎依赖（从 tg_searcher 集成）
 whoosh>=2.7.4
-jieba>=0.42.1
+# jieba>=0.42.1  # 注释掉 jieba 以节省内存，改用 simple 分词器

@@ -322,6 +322,22 @@ TeleSubmit-v2/
 ./switch_mode.sh nosearch     # 禁用搜索 (~60-100 MB)
 ```
 
+### ✨ 自动适配（v2.1+）
+
+**智能分词器切换** - 修改配置后自动完成，无需手动操作：
+
+```ini
+# config.ini
+[SEARCH]
+ANALYZER = simple  # 或 jieba
+```
+
+重启后自动：
+1. 检测分词器变化
+2. 备份旧索引
+3. 创建新索引
+4. 重新索引所有帖子
+
 详见 [MEMORY_USAGE.md](MEMORY_USAGE.md)
 
 ---

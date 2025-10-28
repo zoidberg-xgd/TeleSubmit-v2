@@ -47,13 +47,13 @@ RUN chmod -R 755 logs data
 ENV HTTP_PROXY="" \
     HTTPS_PROXY=""
 
-# 暴露端口（为未来的 webhook 功能预留）
-# EXPOSE 8443
+# 暴露端口（健康检查端口）
+EXPOSE 8080
 
 # 健康检查
-# 检查主进程是否存在，而不仅仅是配置文件
+# 通过 HTTP 健康检查端点检查服务状态
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD python -c "import os, psutil; exit(0 if any('main.py' in ' '.join(p.cmdline()) for p in psutil.process_iter(['cmdline'])) else 1)" || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health').read()" || exit 1
 
 # 运行机器人
 CMD ["python", "-u", "main.py"]

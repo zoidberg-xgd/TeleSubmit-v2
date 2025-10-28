@@ -149,10 +149,28 @@ class PostSearchEngine:
             shutil.rmtree(self.index_dir)
             self.index_dir.mkdir(parents=True)
         
-        # 打开或创建索引
-        if index.exists_in(str(self.index_dir), self.index_name):
-            self.ix = index.open_dir(str(self.index_dir), self.index_name)
-            logger.info(f"打开现有索引: {self.index_dir}")
+        # 打开或创建索引（带兼容性检查）
+        try:
+            index_exists = index.exists_in(str(self.index_dir), self.index_name)
+        except Exception as check_err:
+            # 索引检查失败（可能是因为分词器不兼容）
+            logger.warning(f"索引检查失败: {check_err}")
+            logger.info("将创建新索引")
+            index_exists = False
+        
+        if index_exists:
+            try:
+                self.ix = index.open_dir(str(self.index_dir), self.index_name)
+                logger.info(f"打开现有索引: {self.index_dir}")
+                
+                # 检查索引兼容性
+                if not self._check_index_compatibility():
+                    logger.warning(f"索引不兼容当前配置，将自动重建")
+                    self._rebuild_incompatible_index()
+            except Exception as e:
+                logger.error(f"打开索引失败: {e}")
+                logger.info(f"尝试重建索引...")
+                self._rebuild_incompatible_index()
         else:
             self.ix = index.create_in(str(self.index_dir), PostDocument.get_schema(), self.index_name)
             logger.info(f"创建新索引: {self.index_dir}")
@@ -172,6 +190,88 @@ class PostSearchEngine:
             )
         else:
             self.highlighter = None
+    
+    def _check_index_compatibility(self) -> bool:
+        """
+        检查索引是否与当前配置兼容
+        
+        Returns:
+            bool: True 表示兼容，False 表示不兼容
+        """
+        try:
+            # 尝试读取一个文档，检查是否能正常工作
+            with self.ix.searcher() as searcher:
+                # 检查 schema 是否匹配
+                current_schema = PostDocument.get_schema()
+                index_schema = self.ix.schema
+                
+                # 比较字段名称
+                current_fields = set(current_schema.names())
+                index_fields = set(index_schema.names())
+                
+                if current_fields != index_fields:
+                    logger.warning(f"Schema 字段不匹配: 当前={current_fields}, 索引={index_fields}")
+                    return False
+                
+                # 检查分词器类型（通过尝试搜索来验证）
+                try:
+                    searcher.search(Term("title", "test"), limit=1)
+                except Exception as e:
+                    logger.warning(f"索引搜索测试失败: {e}")
+                    return False
+                
+            return True
+        except Exception as e:
+            logger.error(f"索引兼容性检查失败: {e}")
+            return False
+    
+    def _rebuild_incompatible_index(self):
+        """重建不兼容的索引"""
+        backup_dir = None
+        try:
+            logger.info("开始重建索引...")
+            
+            # 关闭当前索引
+            if hasattr(self, 'ix') and self.ix is not None:
+                try:
+                    self.ix.close()
+                except:
+                    pass
+            
+            # 备份旧索引
+            backup_dir = self.index_dir.parent / f"{self.index_dir.name}.backup"
+            if self.index_dir.exists():
+                try:
+                    if backup_dir.exists():
+                        shutil.rmtree(backup_dir)
+                    shutil.move(str(self.index_dir), str(backup_dir))
+                    logger.info(f"旧索引已备份到: {backup_dir}")
+                except Exception as backup_err:
+                    logger.warning(f"备份索引失败: {backup_err}，将直接删除")
+                    shutil.rmtree(self.index_dir)
+                    backup_dir = None
+            
+            # 创建新索引目录
+            self.index_dir.mkdir(parents=True, exist_ok=True)
+            
+            # 创建新索引
+            self.ix = index.create_in(str(self.index_dir), PostDocument.get_schema(), self.index_name)
+            logger.info(f"新索引创建成功: {self.index_dir}")
+            
+            # 标记需要重新索引
+            self._needs_reindex = True
+            
+        except Exception as e:
+            logger.error(f"重建索引失败: {e}", exc_info=True)
+            # 如果重建失败，尝试恢复备份
+            if backup_dir and backup_dir.exists() and not self.index_dir.exists():
+                try:
+                    shutil.move(str(backup_dir), str(self.index_dir))
+                    logger.info("已恢复旧索引")
+                except:
+                    logger.error("恢复旧索引失败")
+            # 不抛出异常，允许程序继续运行（搜索功能降级）
+            logger.warning("索引重建失败，搜索功能可能不可用")
     
     def add_post(self, post: PostDocument, writer: Optional[IndexWriter] = None):
         """
@@ -391,10 +491,14 @@ def init_search_engine(index_dir: str = "search_index", from_scratch: bool = Fal
     Args:
         index_dir: 索引目录
         from_scratch: 是否从头创建
+        
+    Returns:
+        PostSearchEngine: 搜索引擎实例
     """
     global _search_engine
     _search_engine = PostSearchEngine(index_dir, from_scratch)
     logger.info("搜索引擎初始化完成")
+    return _search_engine
 
 
 # 向后兼容别名：历史代码从 utils.search_engine 导入 SearchEngine

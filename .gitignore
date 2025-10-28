@@ -133,6 +133,15 @@ MEMORY_*.md
 !MEMORY_USAGE.md
 analyze_memory.py
 
+# Fly.io 部署相关（不推送）
+fly.toml
+flyio.env.template
+deploy_fly.sh
+health.py
+FLYIO_*.md
+DEPLOYMENT_SUMMARY.md
+.dockerignore
+
 # 其他临时文件
 *.pyc
 .pytest_cache/
