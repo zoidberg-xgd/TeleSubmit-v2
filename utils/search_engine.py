@@ -148,6 +148,7 @@ class PostSearchEngine:
         )
         
         # 创建高亮器
+        # 降低高亮器开销：更短片段，减少内存占用
         self.highlighter = highlight.Highlighter(
             fragmenter=highlight.ContextFragmenter(maxchars=200, surround=50),
             formatter=highlight.HtmlFormatter()
@@ -328,6 +329,18 @@ class PostSearchEngine:
         """检查索引是否为空"""
         return self.ix.is_empty()
 
+    def optimize_index(self):
+        """
+        优化索引（合并段）。
+        与历史脚本向后兼容，供 upgrade/检查脚本调用。
+        """
+        try:
+            writer = self.ix.writer()
+            writer.commit(optimize=True)
+            logger.info("索引优化完成")
+        except Exception as e:
+            logger.error(f"索引优化失败: {e}", exc_info=True)
+
 
 # 全局搜索引擎实例（单例模式）
 _search_engine: Optional[PostSearchEngine] = None
@@ -360,4 +373,8 @@ def init_search_engine(index_dir: str = "search_index", from_scratch: bool = Fal
     global _search_engine
     _search_engine = PostSearchEngine(index_dir, from_scratch)
     logger.info("搜索引擎初始化完成")
+
+
+# 向后兼容别名：历史代码从 utils.search_engine 导入 SearchEngine
+SearchEngine = PostSearchEngine
 

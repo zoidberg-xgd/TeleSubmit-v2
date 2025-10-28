@@ -206,7 +206,7 @@ async def update_post_stats(context: CallbackContext):
                     failed_count += 1
                 
                 # 避免API限制，每次请求后休眠
-                await asyncio.sleep(2)
+                await asyncio.sleep(1)
             
             await conn.commit()
             logger.info(f"统计数据更新完成：成功 {updated_count} 个，失败 {failed_count} 个")

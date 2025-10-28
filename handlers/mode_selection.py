@@ -6,10 +6,12 @@ from datetime import datetime
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton
 from telegram.ext import ConversationHandler, CallbackContext
 
-from config.settings import BOT_MODE, MODE_MEDIA, MODE_DOCUMENT, MODE_MIXED
+from config.settings import BOT_MODE, MODE_MEDIA, MODE_DOCUMENT, MODE_MIXED, ALLOWED_FILE_TYPES
+from utils.file_validator import create_file_validator
 from models.state import STATE
 from database.db_manager import get_db, cleanup_old_data
 from utils.blacklist import is_blacklisted
+from ui.keyboards import Keyboards
 
 logger = logging.getLogger(__name__)
 
@@ -145,9 +147,15 @@ async def start(update: Update, context: CallbackContext) -> int:
     welcome_message += "💡 **快速开始**\n"
     welcome_message += "想要投稿？直接发送 /submit 命令即可开始！"
     
+    # 根据身份显示不同菜单
+    try:
+        reply_markup = Keyboards.main_menu()
+    except Exception:
+        reply_markup = ReplyKeyboardRemove()
     await update.message.reply_text(
         welcome_message,
-        parse_mode='Markdown'
+        parse_mode='Markdown',
+        reply_markup=reply_markup
     )
     logger.info(f"已发送欢迎信息，user_id: {user_id}")
     return ConversationHandler.END
@@ -250,13 +258,16 @@ async def show_document_welcome(update):
     Args:
         update: Telegram 更新对象
     """
+    file_validator = create_file_validator(ALLOWED_FILE_TYPES)
+    allowed_types_desc = file_validator.get_allowed_types_description()
     await update.message.reply_text(
         "📮 欢迎使用文档投稿功能！请按照以下步骤提交：\n\n"
         "1️⃣ 发送文档文件（必选）：\n"
-        "   - 支持各种资源格式（ZIP、RAR、PDF、DOC等），至少上传1个文件，最多上传10个文件。\n"
+        "   - 至少上传1个文件，最多上传10个文件。\n"
         "   - 📎 请以文件附件形式发送：\n"
         "     • 点击聊天输入框旁的📎图标\n"
-        "     • 选择文件或文档（如压缩包、PDF等）\n"
+        "     • 选择文件或文档\n"
+        f"   - ✅ 允许的文件类型：\n{allowed_types_desc}\n"
         "   - 上传完毕后，请发送 /done_doc。\n\n"
         "2️⃣ 发送媒体文件（可选）：\n"
         "   - 支持图片、视频、GIF、音频等，最多上传10个文件。\n"

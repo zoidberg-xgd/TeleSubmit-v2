@@ -61,6 +61,26 @@ async def handle_callback_query(update: Update, context: CallbackContext):
             await handle_search_action(update, context)
         elif data.startswith("tag_search_"):
             await handle_tag_search(update, context)
+        # 搜索-时间筛选
+        elif data.startswith("time_"):
+            # 记录时间筛选并提示输入关键词
+            mapping = {
+                'time_day': 'day',
+                'time_week': 'week',
+                'time_month': 'month',
+                'time_all': 'all',
+            }
+            time_key = mapping.get(data)
+            if time_key:
+                context.user_data['time_filter'] = time_key
+                context.user_data['search_mode'] = 'fulltext'
+                if time_key == 'all':
+                    await query.edit_message_text("🔍 已选择时间范围：全部\n请输入搜索关键词：")
+                else:
+                    zh = {'day': '今日', 'week': '本周', 'month': '本月'}[time_key]
+                    await query.edit_message_text(f"🔍 已选择时间范围：{zh}\n请输入搜索关键词：")
+            else:
+                await query.edit_message_text("❌ 无效的时间范围")
         
         # 帖子操作
         elif data.startswith("view_post_"):
@@ -70,9 +90,10 @@ async def handle_callback_query(update: Update, context: CallbackContext):
         elif data.startswith("delete_post_"):
             await handle_delete_post(update, context)
         
-        # 管理面板
+        # 管理面板（已移除）：给予提示并返回主菜单
         elif data.startswith("admin_"):
-            await handle_admin_action(update, context)
+            await query.answer("管理面板已下线", show_alert=True)
+            await handle_back_to_main(update, context)
         
         # 黑名单操作
         elif data.startswith("unblock_"):
@@ -243,10 +264,12 @@ async def handle_search_action(update: Update, context: CallbackContext):
         await get_my_posts(update, context)
         
     elif action == "time":
-        await query.edit_message_text(
-            "📅 请选择时间范围：",
-            reply_markup=Keyboards.time_filter()
-        )
+            # 先回应回调，避免界面长时间 loading
+            await query.answer("请选择时间范围")
+            await query.edit_message_text(
+                "📅 请选择时间范围：",
+                reply_markup=Keyboards.time_filter()
+            )
 
 
 async def handle_tag_search(update: Update, context: CallbackContext):
@@ -366,48 +389,7 @@ async def handle_delete_post(update: Update, context: CallbackContext):
     )
 
 
-async def handle_admin_action(update: Update, context: CallbackContext):
-    """处理管理员操作"""
-    query = update.callback_query
-    action = query.data.replace("admin_", "")
-    user_id = update.effective_user.id
-    
-    # 检查权限
-    if not is_owner(user_id):
-        await query.answer("⛔ 仅管理员可用", show_alert=True)
-        return
-    
-    if action == "stats":
-        from handlers.stats_handlers import get_global_stats
-        await get_global_stats(update, context)
-        
-    elif action == "users":
-        await query.edit_message_text(
-            "👥 用户管理功能开发中...",
-            reply_markup=Keyboards.admin_panel()
-        )
-        
-    elif action == "blacklist":
-        from utils.blacklist import manage_blacklist
-        await manage_blacklist(update, context)
-        
-    elif action == "tags":
-        from handlers.search_handlers import get_tag_cloud
-        await get_tag_cloud(update, context)
-        
-    elif action == "update_stats":
-        await query.answer("🔄 正在更新统计数据...")
-        await update_post_stats(context)
-        await query.edit_message_text(
-            "✅ 统计数据已更新",
-            reply_markup=Keyboards.admin_panel()
-        )
-        
-    elif action == "export":
-        await query.edit_message_text(
-            "📤 数据导出功能开发中...",
-            reply_markup=Keyboards.admin_panel()
-        )
+# 管理面板相关逻辑已移除
 
 
 async def handle_unblock_user(update: Update, context: CallbackContext):
@@ -619,6 +601,11 @@ async def handle_back_to_main(update: Update, context: CallbackContext):
         parse_mode=ParseMode.HTML,
         reply_markup=None
     )
+    # 统一返回主菜单（不再显示管理员菜单提示文案）
+    try:
+        await query.message.reply_text("主菜单：", reply_markup=Keyboards.main_menu())
+    except Exception:
+        pass
 
 
 async def handle_back(update: Update, context: CallbackContext):

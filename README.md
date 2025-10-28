@@ -65,7 +65,7 @@ Docker 部署优势：
 - 自动重启：异常退出自动恢复
 - 易于迁移：一键部署到任何服务器
 
-#### 方式四：手动部署（高级用户）
+#### 方式四：手动部署
 
 ```bash
 git clone https://github.com/zoidberg-xgd/TeleSubmit-v2.git
@@ -81,7 +81,7 @@ nano config.ini  # 填入必要配置
 编辑 `config.ini`，填入以下必填项：
 
 ```ini
-[Telegram]
+[BOT]
 TOKEN = your_bot_token_here        # 从 @BotFather 获取
 CHANNEL_ID = @your_channel         # 频道用户名或 ID
 OWNER_ID = 123456789               # 您的 Telegram User ID
@@ -101,7 +101,7 @@ OWNER_ID = 123456789               # 您的 Telegram User ID
 根据您的需求选择合适的方式：
 
 ```bash
-# 方式 1: 一键安装（最简单，推荐新手）
+# 方式 1: 一键安装（最简单）
 ./install.sh
 
 # 方式 2: 快速启动向导（智能选择）
@@ -191,7 +191,7 @@ docker-compose logs -f           # 容器日志
 
 **删除帖子**：仅限 OWNER_ID 用户
 - 删除功能通过回调按钮触发（非命令）
-- 删除操作会同时清理：频道消息、数据库记录、搜索索引
+- 删除操作会清理：数据库记录、搜索索引；不会自动删除频道消息
 - 详细说明请查看 [删除帖子指南](DELETE_POST_GUIDE.md)
 
 详细管理功能请查看 [管理员指南](ADMIN_GUIDE.md)。
@@ -237,7 +237,7 @@ docker-compose logs -f           # 容器日志
 - **自动重建**: 系统启动时检测索引状态，Schema 不匹配时自动重建
 - **增量同步**: 定期同步数据库和索引，保持数据一致性
 - **索引优化**: 自动优化索引结构，提升搜索性能
-- **手动管理**: 使用 `python3 test_index_manager.py` 测试索引功能
+- **手动管理**: 参考 `utils/index_manager.py` 提供的管理能力
 
 详细信息请查看 [索引管理器文档](INDEX_MANAGER_README.md)
 
@@ -315,6 +315,7 @@ TeleSubmit-v2/
 | [索引管理器](INDEX_MANAGER_README.md) | 搜索索引管理工具 |
 | [内存占用说明](MEMORY_USAGE.md) | 内存使用分析与优化 |
 | [更新日志](CHANGELOG.md) | 版本历史、功能更新 |
+| 文档导航（已合并到 README 与各专题文档） | — |
 
 推荐阅读顺序：
 1. 首次部署：README → 脚本指南 → 部署指南
@@ -331,8 +332,8 @@ TeleSubmit-v2/
 3. 检查进程：`ps aux | grep python`
 
 **搜索功能异常？**
-1. 测试索引管理器：`python3 test_index_manager.py`
-2. 重建搜索索引：`python3 migrate_to_search.py`
+1. 重建搜索索引：`python3 migrate_to_search.py`
+2. 同步/查看索引状态：参考 `utils/index_manager.py` 或文档
 3. 检查索引目录：`ls -la data/search_index/`
 
 **热度数据不更新？**

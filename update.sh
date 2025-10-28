@@ -108,8 +108,10 @@ pull_updates() {
         return
     fi
     
-    # 执行更新
-    git pull origin "$CURRENT_BRANCH" || {
+    # 设置默认 pull 策略（避免“需要指定如何调和偏离的分支”）
+    git config pull.rebase false >/dev/null 2>&1 || true
+    # 执行更新（显式使用 --no-rebase，保持合并策略）
+    git pull --no-rebase origin "$CURRENT_BRANCH" || {
         log_error "代码拉取失败"
         log_info "可能存在冲突，请手动解决"
         exit 1

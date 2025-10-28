@@ -11,8 +11,12 @@ from whoosh.query import DateRange
 from config.settings import CHANNEL_ID, OWNER_ID
 from database.db_manager import get_db
 from utils.search_engine import get_search_engine
+from utils.cache import TTLCache
 
 logger = logging.getLogger(__name__)
+
+# 简单缓存：标签云 60s
+_tag_cloud_cache = TTLCache(default_ttl=60, max_size=32)
 
 
 def is_owner(user_id: int) -> bool:
@@ -124,6 +128,14 @@ async def search_posts(update: Update, context: CallbackContext):
             time_filter = DateRange("publish_time", start_time, None)
             time_desc = "本月"
         
+        # 处理时间过滤（来自内联时间筛选）
+        time_filter = context.user_data.get('time_filter')
+        if time_filter:
+            # 将时间过滤转换为 -t 选项处理逻辑
+            if '-t' not in context.args:
+                context.args.extend(['-t', time_filter])
+            context.user_data['time_filter'] = None
+
         # 使用搜索引擎
         search_engine = get_search_engine()
         
@@ -229,6 +241,32 @@ async def search_posts(update: Update, context: CallbackContext):
     except Exception as e:
         logger.error(f"搜索帖子失败: {e}", exc_info=True)
         await update.message.reply_text("❌ 搜索失败，请稍后重试")
+
+
+async def handle_search_input(update: Update, context: CallbackContext):
+    """在选择了搜索模式后，接收用户输入的关键词/标签并执行搜索。"""
+    mode = context.user_data.get('search_mode')
+    if not mode:
+        return  # 未处于搜索输入模式，交给其他处理器
+    text = (update.message.text or '').strip()
+    if not text:
+        await update.message.reply_text("❌ 请输入搜索关键词")
+        return
+    # 提前给用户反馈，避免首次加载分词器带来的感知延迟
+    try:
+        await update.message.reply_text("⏳ 正在搜索…")
+    except Exception:
+        pass
+    # 将文本转换为 /search 的参数形式并复用 search_posts 逻辑
+    if mode == 'tag' and not text.startswith('#'):
+        text = f"#{text}"
+    try:
+        # 设置上下文参数并调用已有的搜索逻辑
+        context.args = [text]
+        await search_posts(update, context)
+    finally:
+        # 退出搜索输入模式
+        context.user_data['search_mode'] = None
 
 
 async def search_posts_by_tag(update: Update, context: CallbackContext, tag: str = None):
@@ -374,6 +412,13 @@ async def get_tag_cloud(update: Update, context: CallbackContext):
         # 按使用次数排序
         sorted_tags = sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)[:limit]
         
+        # 缓存命中（按 limit 区分）
+        cache_key = f"tag_cloud:{limit}"
+        cached = _tag_cloud_cache.get(cache_key)
+        if cached:
+            await update.message.reply_text(cached)
+            return
+
         # 构建标签云消息
         message = f"🏷️ 标签云 TOP {len(sorted_tags)}\n\n"
         
@@ -394,6 +439,7 @@ async def get_tag_cloud(update: Update, context: CallbackContext):
         
         message += f"\n💡 使用 /search #{sorted_tags[0][0]} 搜索该标签的帖子"
         
+        _tag_cloud_cache.set(cache_key, message, ttl=60)
         await update.message.reply_text(message)
         
     except Exception as e:
@@ -427,6 +473,10 @@ async def get_my_posts(update: Update, context: CallbackContext):
     is_owner = (user_id == OWNER_ID)
     
     try:
+        # 支持从消息或回调两种入口回复
+        reply_target = update.message if getattr(update, 'message', None) else (
+            update.callback_query.message if getattr(update, 'callback_query', None) else None
+        )
         # 解析参数
         limit = 10
         if context.args and context.args[0].isdigit():
@@ -443,14 +493,14 @@ async def get_my_posts(update: Update, context: CallbackContext):
             user_posts = await cursor.fetchall()
         
         if not user_posts:
-            await update.message.reply_text(
+            await reply_target.reply_text(
                 "📝 您还没有发布过投稿\n\n"
                 "使用 /submit 开始创建您的第一篇投稿！"
             )
             return
         
         # 逐条发送帖子，每个帖子带操作按钮
-        await update.message.reply_text(
+        await reply_target.reply_text(
             f"📝 我的投稿（最近 {len(user_posts)} 篇）\n\n"
             f"{'💡 提示：作为管理员，您可以直接删除帖子' if is_owner else '💡 提示：点击按钮查看帖子详情'}"
         )
@@ -503,7 +553,7 @@ async def get_my_posts(update: Update, context: CallbackContext):
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             # 发送单个帖子信息
-            await update.message.reply_text(
+            await reply_target.reply_text(
                 message,
                 reply_markup=reply_markup,
                 disable_web_page_preview=True
@@ -511,17 +561,20 @@ async def get_my_posts(update: Update, context: CallbackContext):
             
             # 防止消息过多，最多显示前20篇
             if idx >= 20:
-                await update.message.reply_text(
+                await reply_target.reply_text(
                     f"...\n\n还有更多投稿，使用 /myposts {limit + 10} 查看更多"
                 )
                 break
         
         # 最后发送统计提示
-        await update.message.reply_text("💡 使用 /mystats 查看完整统计")
+        await reply_target.reply_text("💡 使用 /mystats 查看完整统计")
         
     except Exception as e:
-        logger.error(f"获取用户帖子失败: {e}")
-        await update.message.reply_text("❌ 获取帖子列表失败，请稍后重试")
+        logger.error(f"获取用户帖子失败: {e}", exc_info=True)
+        try:
+            await reply_target.reply_text("❌ 获取帖子列表失败，请稍后重试")
+        except Exception:
+            pass
 
 
 async def search_by_user(update: Update, context: CallbackContext):

@@ -19,6 +19,8 @@ from utils.blacklist import (
     _blacklist
 )
 from config.settings import OWNER_ID, NOTIFY_OWNER, TIMEOUT
+from ui.keyboards import Keyboards
+from ui.messages import MessageFormatter
 from utils.database import get_user_state, get_all_user_states
 
 logger = logging.getLogger(__name__)
@@ -36,14 +38,51 @@ async def cancel(update: Update, context: CallbackContext) -> int:
     """
     logger.info(f"收到 /cancel 命令，user_id: {update.effective_user.id}")
     user_id = update.effective_user.id
+    session_exists = False
+    try:
+        async with get_db() as conn:
+            c = await conn.cursor()
+            await c.execute("SELECT 1 FROM submissions WHERE user_id=?", (user_id,))
+            session_exists = await c.fetchone() is not None
+            await c.execute("DELETE FROM submissions WHERE user_id=?", (user_id,))
+    except Exception as e:
+        logger.error(f"取消时删除数据错误: {e}")
+    # 根据是否存在会话给出不同提示
+    message_text = "❌ 投稿已取消" if session_exists else "ℹ️ 当前没有进行中的投稿"
+    try:
+        await update.message.reply_text(message_text, reply_markup=ReplyKeyboardRemove())
+    except Exception:
+        # 在极少数情况下 message 可能不存在
+        try:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=message_text)
+        except Exception:
+            pass
+    return ConversationHandler.END
+
+
+async def cancel_callback(update: Update, context: CallbackContext) -> int:
+    """处理回调按钮触发的取消动作，兼容内联键盘。"""
+    logger.info(f"收到回调取消操作，user_id: {update.effective_user.id}")
+    query = update.callback_query
+    user_id = update.effective_user.id
     try:
         async with get_db() as conn:
             c = await conn.cursor()
             await c.execute("DELETE FROM submissions WHERE user_id=?", (user_id,))
     except Exception as e:
-        logger.error(f"取消时删除数据错误: {e}")
-    # 清除键盘，避免残留旧按钮
-    await update.message.reply_text("❌ 投稿已取消", reply_markup=ReplyKeyboardRemove())
+        logger.error(f"取消(回调)时删除数据错误: {e}")
+    try:
+        await query.answer("已取消")
+    except Exception:
+        pass
+    try:
+        await query.edit_message_text("❌ 投稿已取消")
+    except Exception:
+        # 如果编辑失败，改为新发一条消息
+        try:
+            await query.message.reply_text("❌ 投稿已取消")
+        except Exception:
+            pass
     return ConversationHandler.END
 
 async def help_command(update: Update, context: CallbackContext):
@@ -112,6 +151,62 @@ async def help_command(update: Update, context: CallbackContext):
     except Exception as e:
         logger.error(f"发送帮助信息失败: {e}")
         await update.message.reply_text("❌ 发送帮助信息失败，请稍后重试")
+
+
+# 管理面板相关功能已移除
+
+
+async def handle_menu_shortcuts(update: Update, context: CallbackContext) -> None:
+    """处理底部菜单（ReplyKeyboard）文本，映射到实际命令。"""
+    text = (update.message.text or "").strip()
+    try:
+        # 如果处于搜索输入模式，优先交给搜索输入处理
+        if context.user_data.get('search_mode'):
+            from handlers.search_handlers import handle_search_input
+            await handle_search_input(update, context)
+            return
+        # 开始投稿
+        if text.endswith("开始投稿"):
+            from handlers.mode_selection import submit
+            await submit(update, context)
+            return
+        # 我的统计
+        if text.endswith("我的统计"):
+            from handlers.stats_handlers import get_user_stats
+            await get_user_stats(update, context)
+            return
+        # 我的投稿
+        if text.endswith("我的投稿"):
+            from handlers.search_handlers import get_my_posts
+            await get_my_posts(update, context)
+            return
+        # 热门内容
+        if text.endswith("热门内容"):
+            from handlers.stats_handlers import get_hot_posts
+            await get_hot_posts(update, context)
+            return
+        # 标签云
+        if text.endswith("标签云"):
+            from handlers.search_handlers import get_tag_cloud
+            await get_tag_cloud(update, context)
+            return
+        # 搜索
+        if text.endswith("搜索"):
+            await update.message.reply_text(
+                "🔍 请输入搜索关键词，或点击下方选项：",
+                reply_markup=Keyboards.search_options()
+            )
+            return
+        # 帮助
+        if text.endswith("帮助"):
+            await help_command(update, context)
+            return
+        # 关于
+        if text.endswith("关于"):
+            await update.message.reply_text(MessageFormatter.about_message(), parse_mode="HTML")
+            return
+    except Exception as e:
+        logger.error(f"处理菜单快捷操作失败: {e}")
 
 
 async def settings(update: Update, context: CallbackContext):

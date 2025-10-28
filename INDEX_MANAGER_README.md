@@ -81,20 +81,10 @@ async def on_startup():
         logger.info("索引已自动重建")
 ```
 
-## 测试
+## 使用建议
 
-运行测试脚本验证所有功能：
-
-```bash
-python3 test_index_manager.py
-```
-
-测试内容包括:
-- ✅ 索引重建
-- ✅ 搜索功能
-- ✅ 增量同步
-- ✅ 索引统计
-- ✅ 索引优化
+建议在集成场景中通过 `utils/index_manager.py` 的 API 进行调用与校验。
+常见操作：重建（可清空）、增量同步、优化、状态统计。
 
 ## API 参考
 
@@ -185,12 +175,11 @@ await manager.sync_index()
 
 - `utils/index_manager.py` - 索引管理器实现
 - `utils/search_engine.py` - 搜索引擎核心
-- `test_index_manager.py` - 功能测试脚本
 - `config/settings.py` - 配置文件
 
 ## 更新日志
 
-**2024-10-24**
+**2025-10-25**
 - ✅ 创建索引管理器
 - ✅ 实现重建、同步、优化功能
 - ✅ 修复数据库列名问题 (message_id)
