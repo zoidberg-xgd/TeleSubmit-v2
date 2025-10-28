@@ -60,6 +60,8 @@
    - Bot Token（必填）
    - 频道 ID（必填）
    - 管理员 ID（必填）
+   - **运行模式选择**（Polling/Webhook）
+   - Webhook URL（Webhook 模式时）
 7. 验证配置文件
 8. 初始化数据库
 9. 询问是否立即启动
@@ -69,6 +71,13 @@
 Bot Token (从 @BotFather 获取): 123456:ABC-DEF...
 频道 ID (如 @mychannel 或 -100123456789): @mychannel
 管理员 ID (向 @userinfobot 发消息获取): 123456789
+
+选择运行模式：
+  1) Polling 模式 (轮询) - 推荐用于本地开发和测试
+  2) Webhook 模式 - 推荐用于生产环境和云服务器
+请选择 (1/2) [默认: 1]: 2
+
+Webhook URL (可留空稍后配置): https://your-domain.com
 ```
 
 ### 3. deploy.sh - Docker 部署

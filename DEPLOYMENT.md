@@ -209,8 +209,30 @@ NOTIFY_OWNER = true
 # 机器人工作模式：MEDIA（仅媒体）、DOCUMENT（仅文档）、MIXED（混合）
 BOT_MODE = MIXED
 
+# 运行模式：POLLING（轮询）| WEBHOOK（Webhook）
+# - POLLING: 默认模式，机器人主动拉取消息，适合开发和小型部署
+# - WEBHOOK: Telegram 推送消息到服务器，适合生产环境，更高效
+RUN_MODE = POLLING
+
 # 允许上传的文档类型（后缀或 MIME，逗号分隔；* 表示全部）
 ALLOWED_FILE_TYPES = *
+
+[WEBHOOK]
+# Webhook 模式配置（仅当 BOT.RUN_MODE = WEBHOOK 时生效）
+
+# 外部访问地址（必填，例如: https://your-domain.com）
+# 注意：必须是 HTTPS 且有效的域名
+URL = 
+
+# Webhook 监听端口（默认 8080）
+PORT = 8080
+
+# Webhook 路径（默认 /webhook）
+PATH = /webhook
+
+# Webhook Secret Token（可选，用于验证请求来源）
+# 留空则自动生成随机 token
+SECRET_TOKEN = 
 
 [SEARCH]
 # 搜索引擎配置
@@ -230,7 +252,13 @@ export ADMIN_IDS="123,456"               # 等价于 [BOT].ADMIN_IDS
 export SHOW_SUBMITTER="true"             # 等价于 [BOT].SHOW_SUBMITTER
 export NOTIFY_OWNER="true"               # 等价于 [BOT].NOTIFY_OWNER
 export BOT_MODE="MIXED"                  # 等价于 [BOT].BOT_MODE
+export RUN_MODE="WEBHOOK"                # 等价于 [BOT].RUN_MODE
 export ALLOWED_FILE_TYPES=".pdf,.zip"    # 等价于 [BOT].ALLOWED_FILE_TYPES
+
+export WEBHOOK_URL="https://your-domain.com"  # 等价于 [WEBHOOK].URL
+export WEBHOOK_PORT="8080"                    # 等价于 [WEBHOOK].PORT
+export WEBHOOK_PATH="/webhook"                # 等价于 [WEBHOOK].PATH
+export WEBHOOK_SECRET_TOKEN="your_token"      # 等价于 [WEBHOOK].SECRET_TOKEN
 
 export SEARCH_INDEX_DIR="data/search_index"  # 覆盖 [SEARCH].INDEX_DIR
 export SEARCH_ENABLED="true"                 # 覆盖 [SEARCH].ENABLED
@@ -243,6 +271,61 @@ export SEARCH_ENABLED="true"                 # 覆盖 [SEARCH].ENABLED
 ```bash
 python3 check_config.py
 ```
+
+## 运行模式配置
+
+TeleSubmit v2 支持两种运行模式，可根据部署环境选择：
+
+### Polling 模式（默认）
+
+**适用场景**：本地开发、测试环境、无公网域名
+
+**特点**：
+- 机器人主动拉取消息
+- 配置简单，无需额外设置
+- 网络消耗较高，响应延迟 1-3 秒
+
+**配置**：
+```ini
+[BOT]
+RUN_MODE = POLLING
+```
+
+### Webhook 模式
+
+**适用场景**：生产环境、云服务器、有 HTTPS 域名
+
+**特点**：
+- Telegram 推送消息到服务器
+- 响应快（<1秒）、资源消耗低
+- 需要 HTTPS 公网域名
+
+**配置**：
+```ini
+[BOT]
+RUN_MODE = WEBHOOK
+
+[WEBHOOK]
+URL = https://your-domain.com
+PORT = 8080
+PATH = /webhook
+SECRET_TOKEN = your_random_token  # 可选
+```
+
+**环境变量方式**：
+```bash
+export RUN_MODE=WEBHOOK
+export WEBHOOK_URL=https://your-domain.com
+export WEBHOOK_PORT=8080
+export WEBHOOK_PATH=/webhook
+export WEBHOOK_SECRET_TOKEN=your_random_token
+```
+
+**模式切换**：
+- 修改配置后使用 `./restart.sh` 重启即可
+- 系统会自动处理模式切换和清理
+
+详细说明请查看 [Webhook 模式完整指南](docs/WEBHOOK_MODE.md)。
 
 ## 启动和管理
 
