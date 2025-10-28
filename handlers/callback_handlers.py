@@ -70,9 +70,10 @@ async def handle_callback_query(update: Update, context: CallbackContext):
         elif data.startswith("delete_post_"):
             await handle_delete_post(update, context)
         
-        # 管理面板
+        # 管理面板（已移除）：给予提示并返回主菜单
         elif data.startswith("admin_"):
-            await handle_admin_action(update, context)
+            await query.answer("管理面板已下线", show_alert=True)
+            await handle_back_to_main(update, context)
         
         # 黑名单操作
         elif data.startswith("unblock_"):
@@ -366,48 +367,7 @@ async def handle_delete_post(update: Update, context: CallbackContext):
     )
 
 
-async def handle_admin_action(update: Update, context: CallbackContext):
-    """处理管理员操作"""
-    query = update.callback_query
-    action = query.data.replace("admin_", "")
-    user_id = update.effective_user.id
-    
-    # 检查权限
-    if not is_owner(user_id):
-        await query.answer("⛔ 仅管理员可用", show_alert=True)
-        return
-    
-    if action == "stats":
-        from handlers.stats_handlers import get_global_stats
-        await get_global_stats(update, context)
-        
-    elif action == "users":
-        await query.edit_message_text(
-            "👥 用户管理功能开发中...",
-            reply_markup=Keyboards.admin_panel()
-        )
-        
-    elif action == "blacklist":
-        from utils.blacklist import manage_blacklist
-        await manage_blacklist(update, context)
-        
-    elif action == "tags":
-        from handlers.search_handlers import get_tag_cloud
-        await get_tag_cloud(update, context)
-        
-    elif action == "update_stats":
-        await query.answer("🔄 正在更新统计数据...")
-        await update_post_stats(context)
-        await query.edit_message_text(
-            "✅ 统计数据已更新",
-            reply_markup=Keyboards.admin_panel()
-        )
-        
-    elif action == "export":
-        await query.edit_message_text(
-            "📤 数据导出功能开发中...",
-            reply_markup=Keyboards.admin_panel()
-        )
+# 管理面板相关逻辑已移除
 
 
 async def handle_unblock_user(update: Update, context: CallbackContext):

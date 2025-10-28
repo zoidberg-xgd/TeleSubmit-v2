@@ -10,7 +10,7 @@ from config.settings import BOT_MODE, MODE_MEDIA, MODE_DOCUMENT, MODE_MIXED, ALL
 from utils.file_validator import create_file_validator
 from models.state import STATE
 from database.db_manager import get_db, cleanup_old_data
-from utils.blacklist import is_blacklisted, is_owner
+from utils.blacklist import is_blacklisted
 from ui.keyboards import Keyboards
 
 logger = logging.getLogger(__name__)
@@ -149,7 +149,7 @@ async def start(update: Update, context: CallbackContext) -> int:
     
     # 根据身份显示不同菜单
     try:
-        reply_markup = Keyboards.admin_menu() if is_owner(user_id) else Keyboards.main_menu()
+        reply_markup = Keyboards.main_menu()
     except Exception:
         reply_markup = ReplyKeyboardRemove()
     await update.message.reply_text(

@@ -50,7 +50,7 @@ from handlers import (
 
 # 黑名单管理
 from utils.blacklist import manage_blacklist, init_blacklist, blacklist_filter
-from handlers.command_handlers import blacklist_add, blacklist_remove, blacklist_list, catch_all, debug, open_admin_panel
+from handlers.command_handlers import blacklist_add, blacklist_remove, blacklist_list, catch_all, debug
 
 # 投稿处理
 from handlers.publish import publish_submission
@@ -201,7 +201,6 @@ async def setup_bot_commands(application):
         BotCommand("hot", "🔥 查看热门投稿"),
         BotCommand("help", "❓ 查看帮助信息"),
         BotCommand("cancel", "❌ 取消当前操作"),
-        BotCommand("admin", "👑 管理面板"),
         BotCommand("settings", "⚙️ 机器人设置"),
     ]
     
@@ -341,8 +340,6 @@ def setup_application(application):
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("settings", settings))
     application.add_handler(CommandHandler("blacklist", manage_blacklist), group=1)
-    # 管理面板入口（仅所有者可见）
-    application.add_handler(CommandHandler("admin", open_admin_panel))
     
     # 注册统计和搜索命令处理器
     application.add_handler(CommandHandler("hot", get_hot_posts))

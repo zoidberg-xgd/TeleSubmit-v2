@@ -18,7 +18,6 @@ from utils.blacklist import (
     is_blacklisted,
     _blacklist
 )
-from ui.keyboards import Keyboards
 from config.settings import OWNER_ID, NOTIFY_OWNER, TIMEOUT
 from utils.database import get_user_state, get_all_user_states
 
@@ -115,22 +114,7 @@ async def help_command(update: Update, context: CallbackContext):
         await update.message.reply_text("❌ 发送帮助信息失败，请稍后重试")
 
 
-async def open_admin_panel(update: Update, context: CallbackContext) -> None:
-    """显示管理员面板（仅 OWNER 可见）。"""
-    user_id = update.effective_user.id
-    if not is_owner(user_id):
-        try:
-            await update.message.reply_text("⛔ 此功能仅限机器人所有者使用")
-        except Exception:
-            pass
-        return
-    try:
-        await update.message.reply_text(
-            "👑 管理面板",
-            reply_markup=Keyboards.admin_panel()
-        )
-    except Exception as e:
-        logger.error(f"显示管理面板失败: {e}")
+# 管理面板相关功能已移除
 
 
 async def settings(update: Update, context: CallbackContext):

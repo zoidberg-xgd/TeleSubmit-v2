@@ -33,30 +33,8 @@ class Keyboards:
     
     @staticmethod
     def admin_menu():
-        """管理员菜单键盤"""
-        keyboard = [
-            [
-                KeyboardButton("📝 开始投稿"),
-                KeyboardButton("📊 我的统计")
-            ],
-            [
-                KeyboardButton("📋 我的投稿"),
-                KeyboardButton("🔥 热门内容")
-            ],
-            [
-                KeyboardButton("🔍 搜索"),
-                KeyboardButton("🏷️ 标签云")
-            ],
-            [
-                KeyboardButton("👑 管理面板"),
-                KeyboardButton("📈 全局统计")
-            ],
-            [
-                KeyboardButton("❓ 帮助"),
-                KeyboardButton("ℹ️ 关于")
-            ]
-        ]
-        return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        """管理员菜单（与主菜单一致，保留兼容）"""
+        return Keyboards.main_menu()
     
     @staticmethod
     def submission_confirm(session_id: int):
@@ -138,24 +116,8 @@ class Keyboards:
     
     @staticmethod
     def admin_panel():
-        """管理面板键盘"""
-        keyboard = [
-            [
-                InlineKeyboardButton("📊 全局统计", callback_data="admin_stats"),
-                InlineKeyboardButton("👥 用户管理", callback_data="admin_users")
-            ],
-            [
-                InlineKeyboardButton("🚫 黑名单", callback_data="admin_blacklist"),
-                InlineKeyboardButton("🏷️ 标签管理", callback_data="admin_tags")
-            ],
-            [
-                InlineKeyboardButton("🔄 更新统计", callback_data="admin_update_stats"),
-                InlineKeyboardButton("📤 导出数据", callback_data="admin_export")
-            ],
-            [
-                InlineKeyboardButton("🔙 返回主菜单", callback_data="back_main")
-            ]
-        ]
+        """已移除：返回到主菜单按钮（兼容旧回调）"""
+        keyboard = [[InlineKeyboardButton("🔙 返回主菜单", callback_data="back_main")]]
         return InlineKeyboardMarkup(keyboard)
     
     @staticmethod
