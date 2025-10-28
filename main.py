@@ -80,7 +80,8 @@ from handlers.search_handlers import (
     get_tag_cloud, 
     get_my_posts, 
     search_by_user, 
-    delete_posts_batch
+    delete_posts_batch,
+    handle_search_input
 )
 from handlers.index_handlers import (
     rebuild_index_command,
@@ -464,8 +465,10 @@ def setup_application(application):
     
     # 将底部菜单文本映射到命令（在最低优先级前处理）
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_menu_shortcuts), group=998)
+    # 搜索模式下的自然语言输入处理（在更低优先级，避免干扰其他文本处理）
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_search_input), group=999)
     # 添加未处理消息的捕获处理器 (最低优先级组)
-    application.add_handler(MessageHandler(filters.ALL, catch_all), group=999)
+    application.add_handler(MessageHandler(filters.ALL, catch_all), group=1000)
     
     logger.info("应用程序设置完成")
 

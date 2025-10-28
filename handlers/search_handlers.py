@@ -231,6 +231,27 @@ async def search_posts(update: Update, context: CallbackContext):
         await update.message.reply_text("❌ 搜索失败，请稍后重试")
 
 
+async def handle_search_input(update: Update, context: CallbackContext):
+    """在选择了搜索模式后，接收用户输入的关键词/标签并执行搜索。"""
+    mode = context.user_data.get('search_mode')
+    if not mode:
+        return  # 未处于搜索输入模式，交给其他处理器
+    text = (update.message.text or '').strip()
+    if not text:
+        await update.message.reply_text("❌ 请输入搜索关键词")
+        return
+    # 将文本转换为 /search 的参数形式并复用 search_posts 逻辑
+    if mode == 'tag' and not text.startswith('#'):
+        text = f"#{text}"
+    try:
+        # 设置上下文参数并调用已有的搜索逻辑
+        context.args = [text]
+        await search_posts(update, context)
+    finally:
+        # 退出搜索输入模式
+        context.user_data['search_mode'] = None
+
+
 async def search_posts_by_tag(update: Update, context: CallbackContext, tag: str = None):
     """
     按标签搜索帖子（回调查询专用）
