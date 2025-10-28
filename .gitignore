@@ -138,3 +138,4 @@ analyze_memory.py
 .pytest_cache/
 .coverage
 htmlcov/
+.last_backup
