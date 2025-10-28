@@ -11,8 +11,12 @@ from whoosh.query import DateRange
 from config.settings import CHANNEL_ID, OWNER_ID
 from database.db_manager import get_db
 from utils.search_engine import get_search_engine
+from utils.cache import TTLCache
 
 logger = logging.getLogger(__name__)
+
+# 简单缓存：标签云 60s
+_tag_cloud_cache = TTLCache(default_ttl=60, max_size=32)
 
 
 def is_owner(user_id: int) -> bool:
@@ -408,6 +412,13 @@ async def get_tag_cloud(update: Update, context: CallbackContext):
         # 按使用次数排序
         sorted_tags = sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)[:limit]
         
+        # 缓存命中（按 limit 区分）
+        cache_key = f"tag_cloud:{limit}"
+        cached = _tag_cloud_cache.get(cache_key)
+        if cached:
+            await update.message.reply_text(cached)
+            return
+
         # 构建标签云消息
         message = f"🏷️ 标签云 TOP {len(sorted_tags)}\n\n"
         
@@ -428,6 +439,7 @@ async def get_tag_cloud(update: Update, context: CallbackContext):
         
         message += f"\n💡 使用 /search #{sorted_tags[0][0]} 搜索该标签的帖子"
         
+        _tag_cloud_cache.set(cache_key, message, ttl=60)
         await update.message.reply_text(message)
         
     except Exception as e:

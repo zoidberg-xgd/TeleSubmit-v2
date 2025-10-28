@@ -20,6 +20,14 @@ async def get_db():
     """
     conn = await aiosqlite.connect(DB_PATH)
     conn.row_factory = aiosqlite.Row
+    # 优化 SQLite 运行参数，降低 I/O 延迟
+    try:
+        await conn.execute("PRAGMA journal_mode=WAL;")
+        await conn.execute("PRAGMA synchronous=NORMAL;")
+        await conn.execute("PRAGMA temp_store=MEMORY;")
+        await conn.execute("PRAGMA cache_size=-20000;")  # 约 20MB page cache
+    except Exception:
+        pass
     try:
         yield conn
         await conn.commit()
