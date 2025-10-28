@@ -295,27 +295,36 @@ fly secrets set WEBHOOK_SECRET_TOKEN=your_generated_token -a your-app-name
 
 ### HTTPS 要求
 
-Telegram 要求 Webhook URL 必须是 HTTPS。Fly.io 自动提供 HTTPS 证书，无需额外配置。
+Telegram 要求 Webhook URL 必须是 HTTPS。
+
+**获取 HTTPS 证书**:
+- **PaaS 平台**: 通常自动提供（Fly.io、Heroku、Railway 等）
+- **VPS**: 使用 Let's Encrypt 或 Caddy 自动配置
+- **Nginx**: 配合 Certbot 获取免费证书
 
 ---
 
-## ✅ Fly.io 部署验证
+## ✅ 部署验证
 
 **测试结果**: ✅ 在 256MB 内存环境下成功运行
 
 ```bash
-# 已验证配置
+# 已验证配置（PaaS 平台示例）
 Memory: 256MB
-Region: sjc
-Webhook URL: https://your-app.fly.dev/webhook
+Webhook URL: https://your-app.example.com/webhook
 Health Check: OK
-Status: started (稳定运行)
+Status: 稳定运行
 ```
 
 **关键优化**:
 - ✅ 端口复用：Webhook 服务器同时处理 `/webhook` 和 `/health`
 - ✅ 内存优化：使用 `SEARCH_ANALYZER=simple` 节省 ~140MB
 - ✅ 无需额外端口：health.py 仅在 Polling 模式启动
+
+**验证平台**:
+- ✅ PaaS 平台（256MB）
+- ✅ VPS 服务器（512MB+）
+- ✅ Docker 容器（256MB+）
 
 ---
 
@@ -380,10 +389,15 @@ curl https://your-app.fly.dev/health
 PORT = 8081
 ```
 
-**注意**：确保 Fly.io 的 `fly.toml` 也更新相应端口：
+**注意**：如果使用配置文件部署，也需要更新相应端口：
 ```toml
+# 示例：fly.toml (Fly.io)
 [[services]]
   internal_port = 8081
+
+# 示例：docker-compose.yml
+ports:
+  - "8081:8081"
 ```
 
 ---
@@ -396,16 +410,31 @@ PORT = 8081
 2. **节省资源**：无需持续发送轮询请求
 3. **更好的并发**：适合高并发场景
 
-### 推荐配置（Fly.io）
+### 推荐配置
 
-```toml
-[env]
-  RUN_MODE = "WEBHOOK"
-  WEBHOOK_URL = "https://your-app.fly.dev"
-  
-  # 其他优化配置
-  SEARCH_ANALYZER = "simple"  # 节省内存
-  DB_CACHE_KB = "1024"        # 适度缓存
+**通用优化**（适用于所有平台）:
+```ini
+# config.ini
+[BOT]
+RUN_MODE = WEBHOOK
+
+[WEBHOOK]
+URL = https://your-domain.com
+
+# 内存优化
+[SEARCH]
+ANALYZER = simple  # 节省 ~140MB
+
+[DB]
+CACHE_SIZE_KB = 1024  # 适度缓存
+```
+
+**PaaS 平台环境变量**:
+```bash
+RUN_MODE=WEBHOOK
+WEBHOOK_URL=https://your-app.example.com
+SEARCH_ANALYZER=simple
+DB_CACHE_KB=1024
 ```
 
 ---
@@ -416,8 +445,9 @@ PORT = 8081
 
 - ✅ 使用 **Webhook 模式**
 - ✅ 设置 **Secret Token**
-- ✅ 启用 HTTPS（Fly.io 自动）
+- ✅ 启用 HTTPS（Let's Encrypt 或 PaaS 自动）
 - ✅ 配置健康检查
+- ✅ 使用反向代理（Nginx/Caddy）
 
 ### 2. 开发环境
 
@@ -427,9 +457,9 @@ PORT = 8081
 
 ### 3. 混合部署
 
-- 生产服务器：Webhook 模式
-- 开发/测试：Polling 模式
-- 通过配置文件轻松切换
+- **生产服务器**: Webhook 模式（云平台/VPS）
+- **开发/测试**: Polling 模式（本地）
+- **通过配置轻松切换**: 无需修改代码
 
 ---
 
@@ -438,7 +468,7 @@ PORT = 8081
 - [主文档 - README.md](../README.md)
 - [脚本使用指南 - SCRIPTS_GUIDE.md](../SCRIPTS_GUIDE.md)
 - [内存优化指南 - MEMORY_USAGE.md](../MEMORY_USAGE.md)
-- [Fly.io 部署文档](https://fly.io/docs/)
+- [配置示例 - config.ini.example](../config.ini.example)
 
 ---
 
@@ -448,7 +478,8 @@ PORT = 8081
 
 **A**: 
 - **本地开发/测试** → Polling 模式
-- **Fly.io/云服务器** → Webhook 模式
+- **生产环境（有公网 HTTPS 域名）** → Webhook 模式
+- **VPS/云服务器/PaaS 平台** → Webhook 模式
 
 ### Q: 切换模式会影响数据吗？
 
@@ -473,9 +504,11 @@ PORT = 8081
 
 ```
 Telegram 服务器
-    ↓ POST /webhook
-你的服务器 (Fly.io)
-    ↓ 处理 Update
+    ↓ HTTPS POST /webhook
+你的服务器（云平台/VPS）
+    ↓ 验证 Secret Token
+aiohttp Webhook Server
+    ↓ 解析 Update
 Bot Application
     ↓ 调用 Handler
 处理消息并响应
