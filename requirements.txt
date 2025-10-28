@@ -13,4 +13,17 @@ psutil==5.9.8
 
 # 搜索引擎依赖（从 tg_searcher 集成）
 whoosh>=2.7.4
-# jieba>=0.42.1  # 注释掉 jieba 以节省内存，改用 simple 分词器
+
+# jieba 中文分词器（可选）
+# 如需高质量中文分词，取消下面的注释：
+# jieba>=0.42.1
+#
+# 使用场景：
+# - 注释掉（默认）：使用 simple 分词器，节省 ~140MB 内存，适合 256MB 环境
+# - 取消注释：使用 jieba 分词器，智能中文分词，需要 512MB+ 内存
+#
+# 切换方法：
+# 1. 取消/添加注释
+# 2. 重新安装依赖：pip install -r requirements.txt
+# 3. 修改 config.ini: [SEARCH] ANALYZER = jieba 或 simple
+# 4. 重启应用（自动适配索引）

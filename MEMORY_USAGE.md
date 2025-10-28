@@ -197,6 +197,31 @@ ANALYZER = simple  # 从 jieba 改为 simple
   4. 从数据库重新索引所有帖子
 - **无需手动操作！**
 
+**如何启用 jieba**（高质量中文分词）:
+```bash
+# 1. 安装 jieba
+# 编辑 requirements.txt，取消注释: jieba>=0.42.1
+pip install jieba>=0.42.1
+
+# 2. 修改配置
+# config.ini: [SEARCH] ANALYZER = jieba
+
+# 3. 重启应用（自动完成索引重建）
+./restart.sh
+```
+
+**如何切换回 simple**（节省内存）:
+```bash
+# 1. 修改配置
+# config.ini: [SEARCH] ANALYZER = simple
+
+# 2. 重启应用（自动完成）
+./restart.sh
+
+# 3. 可选：卸载 jieba 节省空间
+pip uninstall jieba -y
+```
+
 **手动重建**（旧版本或故障排查）:
 ```bash
 # 通过机器人命令（推荐）
