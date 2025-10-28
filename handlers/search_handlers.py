@@ -248,6 +248,11 @@ async def handle_search_input(update: Update, context: CallbackContext):
     if not text:
         await update.message.reply_text("❌ 请输入搜索关键词")
         return
+    # 提前给用户反馈，避免首次加载分词器带来的感知延迟
+    try:
+        await update.message.reply_text("⏳ 正在搜索…")
+    except Exception:
+        pass
     # 将文本转换为 /search 的参数形式并复用 search_posts 逻辑
     if mode == 'tag' and not text.startswith('#'):
         text = f"#{text}"

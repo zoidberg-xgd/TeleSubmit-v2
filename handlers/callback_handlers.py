@@ -264,10 +264,12 @@ async def handle_search_action(update: Update, context: CallbackContext):
         await get_my_posts(update, context)
         
     elif action == "time":
-        await query.edit_message_text(
-            "📅 请选择时间范围：",
-            reply_markup=Keyboards.time_filter()
-        )
+            # 先回应回调，避免界面长时间 loading
+            await query.answer("请选择时间范围")
+            await query.edit_message_text(
+                "📅 请选择时间范围：",
+                reply_markup=Keyboards.time_filter()
+            )
 
 
 async def handle_tag_search(update: Update, context: CallbackContext):
