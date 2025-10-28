@@ -1,6 +1,9 @@
 # Telegram Bot 核心
 python-telegram-bot[job-queue]==21.10
 
+# Webhook 支持（用于 Webhook 模式）
+aiohttp>=3.9.0
+
 # 配置管理
 configparser==6.0.0
 python-dotenv==1.0.0

@@ -24,7 +24,10 @@ from telegram.ext import (
 from dotenv import load_dotenv
 
 # 配置相关导入
-from config.settings import TOKEN, TIMEOUT, BOT_MODE, MODE_MEDIA, MODE_DOCUMENT, MODE_MIXED
+from config.settings import (
+    TOKEN, TIMEOUT, BOT_MODE, MODE_MEDIA, MODE_DOCUMENT, MODE_MIXED,
+    RUN_MODE, WEBHOOK_URL, WEBHOOK_PORT, WEBHOOK_PATH, WEBHOOK_SECRET_TOKEN
+)
 from models.state import STATE
 
 # 数据库相关导入
@@ -227,11 +230,12 @@ async def main():
     logger.info(f"启动TeleSubmit机器人。版本: {CONFIG.get('VERSION', '0.1.0')}")
     logger.info(f"会话超时时间: {TIMEOUT_SECONDS}秒")
     
-    # 启动健康检查服务器（用于 Fly.io 部署）
-    if HEALTH_SERVER_ENABLED:
+    # 启动健康检查服务器（仅在 Polling 模式下）
+    # Webhook 模式会使用 telegram 的内置服务器
+    if HEALTH_SERVER_ENABLED and RUN_MODE == 'POLLING':
         try:
             start_health_server(port=8080)
-            logger.info("健康检查服务器已启动")
+            logger.info("健康检查服务器已启动（Polling 模式）")
         except Exception as e:
             logger.warning(f"启动健康检查服务器失败: {e}")
     
@@ -309,35 +313,112 @@ async def main():
     # 设置应用程序
     setup_application(application)
     
-    # 使用start_polling方法而不是run_polling
-    logger.info("机器人正在启动，使用Ctrl+C停止")
+    # 初始化应用程序
+    logger.info(f"机器人正在启动，运行模式: {RUN_MODE}")
     await application.initialize()
     await application.start()
     
     # 设置命令菜单
     await setup_bot_commands(application)
     
-    await application.updater.start_polling(allowed_updates=None)
+    # 根据运行模式选择启动方式
+    webhook_server = None
+    
+    if RUN_MODE == 'WEBHOOK':
+        # Webhook 模式
+        logger.info("📡 启动 Webhook 模式...")
+        
+        # 验证 Webhook URL
+        if not WEBHOOK_URL:
+            logger.error("❌ Webhook 模式需要设置 WEBHOOK_URL")
+            sys.exit(1)
+        
+        # 导入 Webhook 服务器模块
+        from utils.webhook_server import WebhookServer, setup_webhook
+        
+        # 生成或使用 Secret Token
+        import secrets
+        secret_token = WEBHOOK_SECRET_TOKEN or secrets.token_urlsafe(32)
+        if not WEBHOOK_SECRET_TOKEN:
+            logger.info(f"已自动生成 Secret Token: {secret_token}")
+        
+        # 创建并启动 Webhook 服务器（包含健康检查）
+        webhook_server = WebhookServer(
+            application=application,
+            port=WEBHOOK_PORT,
+            path=WEBHOOK_PATH,
+            secret_token=secret_token
+        )
+        await webhook_server.start()
+        
+        # 设置 Telegram Webhook
+        success = await setup_webhook(
+            application=application,
+            webhook_url=WEBHOOK_URL,
+            webhook_path=WEBHOOK_PATH,
+            secret_token=secret_token
+        )
+        
+        if not success:
+            logger.error("❌ Webhook 设置失败")
+            await webhook_server.stop()
+            sys.exit(1)
+        
+        logger.info(f"✅ Webhook 模式已启动")
+        logger.info(f"   监听地址: 0.0.0.0:{WEBHOOK_PORT}{WEBHOOK_PATH}")
+        logger.info(f"   外部地址: {WEBHOOK_URL}{WEBHOOK_PATH}")
+        logger.info(f"   健康检查: http://0.0.0.0:{WEBHOOK_PORT}/health")
+        logger.info(f"   Secret Token: {'已设置' if WEBHOOK_SECRET_TOKEN else f'{secret_token[:16]}...'}")
+        
+    else:
+        # Polling 模式（默认）
+        logger.info("🔄 启动 Polling 模式...")
+        await application.updater.start_polling(allowed_updates=None)
+        logger.info("✅ Polling 模式已启动")
     
     # 添加事件处理器以便优雅关闭
     loop = asyncio.get_running_loop()
     stop_signals = (signal.SIGINT, signal.SIGTERM, signal.SIGABRT)
     for s in stop_signals:
         loop.add_signal_handler(
-            s, lambda s=s: asyncio.create_task(shutdown(application, s, loop))
+            s, lambda s=s: asyncio.create_task(shutdown(application, s, loop, webhook_server))
         )
         
+    logger.info("机器人运行中，使用 Ctrl+C 停止")
+    
     # 保持应用程序运行
     await asyncio.Event().wait()
     
     logger.info("机器人已停止")
 
 
-async def shutdown(application, signal, loop):
+async def shutdown(application, signal, loop, webhook_server=None):
     """
     优雅地关闭机器人
+    
+    Args:
+        application: telegram.ext.Application 实例
+        signal: 信号类型
+        loop: 事件循环
+        webhook_server: Webhook 服务器实例（可选，预留参数）
     """
     logger.info(f"收到信号 {signal.name}，正在关闭...")
+    
+    # 如果是 Webhook 模式，停止 webhook 服务器并删除 webhook
+    if webhook_server:
+        try:
+            logger.info("正在停止 Webhook 服务器...")
+            await webhook_server.stop()
+            logger.info("Webhook 服务器已停止")
+        except Exception as e:
+            logger.warning(f"停止 Webhook 服务器失败: {e}")
+        
+        try:
+            logger.info("正在删除 Telegram Webhook...")
+            await application.bot.delete_webhook(drop_pending_updates=False)
+            logger.info("Telegram Webhook 已删除")
+        except Exception as e:
+            logger.warning(f"删除 Webhook 失败: {e}")
     
     # 关闭机器人更新器
     await application.updater.stop()

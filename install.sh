@@ -179,18 +179,74 @@ configure_bot() {
         log_error "请输入有效的数字 ID！"
     done
     
+    # 运行模式选择
+    echo ""
+    echo -e "${BOLD}选择运行模式：${NC}"
+    echo "  1) Polling 模式 (轮询) - 推荐用于本地开发和测试"
+    echo "  2) Webhook 模式 - 推荐用于生产环境和云服务器"
+    echo ""
+    while true; do
+        read -p "请选择 (1/2) [默认: 1]: " RUN_MODE_CHOICE
+        RUN_MODE_CHOICE=${RUN_MODE_CHOICE:-1}
+        if [[ "$RUN_MODE_CHOICE" == "1" ]]; then
+            RUN_MODE="POLLING"
+            log_success "已选择 Polling 模式"
+            WEBHOOK_URL=""
+            break
+        elif [[ "$RUN_MODE_CHOICE" == "2" ]]; then
+            RUN_MODE="WEBHOOK"
+            log_success "已选择 Webhook 模式"
+            echo ""
+            log_info "Webhook 模式需要一个公网 HTTPS 地址"
+            log_info "示例: https://your-domain.com 或 https://your-app.fly.dev"
+            echo ""
+            while true; do
+                read -p "Webhook URL (可留空稍后配置): " WEBHOOK_URL
+                if [ -z "$WEBHOOK_URL" ]; then
+                    log_warning "Webhook URL 未设置，需要稍后在 config.ini 中配置"
+                    break
+                elif [[ "$WEBHOOK_URL" =~ ^https:// ]]; then
+                    log_success "Webhook URL: $WEBHOOK_URL"
+                    break
+                else
+                    log_error "Webhook URL 必须以 https:// 开头"
+                fi
+            done
+            break
+        else
+            log_error "无效选择，请输入 1 或 2"
+        fi
+    done
+    
     # 写入配置
     if [ "$OS" = "macos" ]; then
         sed -i '' "s/TOKEN = .*/TOKEN = $BOT_TOKEN/" config.ini
         sed -i '' "s/CHANNEL_ID = .*/CHANNEL_ID = $CHANNEL_ID/" config.ini
         sed -i '' "s/OWNER_ID = .*/OWNER_ID = $OWNER_ID/" config.ini
+        sed -i '' "s/RUN_MODE = .*/RUN_MODE = $RUN_MODE/" config.ini
+        if [ ! -z "$WEBHOOK_URL" ]; then
+            sed -i '' "s|URL = .*|URL = $WEBHOOK_URL|" config.ini
+        fi
     else
         sed -i "s/TOKEN = .*/TOKEN = $BOT_TOKEN/" config.ini
         sed -i "s/CHANNEL_ID = .*/CHANNEL_ID = $CHANNEL_ID/" config.ini
         sed -i "s/OWNER_ID = .*/OWNER_ID = $OWNER_ID/" config.ini
+        sed -i "s/RUN_MODE = .*/RUN_MODE = $RUN_MODE/" config.ini
+        if [ ! -z "$WEBHOOK_URL" ]; then
+            sed -i "s|URL = .*|URL = $WEBHOOK_URL|" config.ini
+        fi
     fi
     
     log_success "配置已保存到 config.ini"
+    
+    # 显示配置摘要
+    echo ""
+    echo -e "${CYAN}${BOLD}配置摘要：${NC}"
+    echo -e "  运行模式: ${BOLD}$RUN_MODE${NC}"
+    if [ "$RUN_MODE" == "WEBHOOK" ] && [ ! -z "$WEBHOOK_URL" ]; then
+        echo -e "  Webhook URL: ${BOLD}$WEBHOOK_URL${NC}"
+    fi
+    echo ""
 }
 
 # 验证配置

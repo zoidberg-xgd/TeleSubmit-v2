@@ -77,6 +77,45 @@ nano config.ini  # 填入必要配置
 ./start.sh
 ```
 
+## 运行模式
+
+TeleSubmit v2 支持两种运行模式：
+
+### 📱 Polling 模式（默认）
+- **工作原理**：机器人主动拉取消息
+- **适用场景**：本地开发、测试环境
+- **优点**：配置简单，无需公网域名
+- **缺点**：网络消耗较高，响应延迟 1-3 秒
+
+### 🌐 Webhook 模式
+- **工作原理**：Telegram 推送消息到服务器
+- **适用场景**：生产环境、云服务器
+- **优点**：响应快（<1秒）、资源消耗低
+- **缺点**：需要 HTTPS 公网域名
+
+### 快速切换
+
+**配置文件方式**：
+```ini
+[BOT]
+RUN_MODE = WEBHOOK  # 或 POLLING
+
+[WEBHOOK]
+URL = https://your-domain.com
+PORT = 8080
+PATH = /webhook
+```
+
+**环境变量方式**：
+```bash
+export RUN_MODE=WEBHOOK
+export WEBHOOK_URL=https://your-domain.com
+```
+
+详见 [Webhook 模式完整指南](docs/WEBHOOK_MODE.md)
+
+---
+
 ## 基本配置
 
 编辑 `config.ini`，填入以下必填项：
