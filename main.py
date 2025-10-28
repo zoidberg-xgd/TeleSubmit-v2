@@ -339,6 +339,7 @@ def setup_application(application):
     
     # 注册基本命令处理器
     application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("cancel", cancel))
     application.add_handler(CommandHandler("settings", settings))
     application.add_handler(CommandHandler("blacklist", manage_blacklist), group=1)
     
