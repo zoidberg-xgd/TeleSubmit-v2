@@ -64,9 +64,8 @@ class IndexManager:
                 # 重新初始化索引
                 os.makedirs(index_dir, exist_ok=True)
                 from whoosh.index import create_in
-                from utils.search_engine import PostDocument
-                
-                self.search_engine.ix = create_in(index_dir, PostDocument.schema)
+                # 使用模块级的 PostDocument，避免函数内重复导入造成作用域遮蔽
+                self.search_engine.ix = create_in(index_dir, PostDocument.get_schema())
                 logger.info(f"已重新创建索引: {index_dir}")
             
             # 2. 从数据库读取所有帖子

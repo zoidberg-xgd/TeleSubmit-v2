@@ -6,7 +6,7 @@ from datetime import datetime
 from contextlib import asynccontextmanager
 import aiosqlite
 
-from config.settings import DB_PATH, TIMEOUT
+from config.settings import DB_PATH, TIMEOUT, DB_CACHE_KB
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,8 @@ async def get_db():
         await conn.execute("PRAGMA journal_mode=WAL;")
         await conn.execute("PRAGMA synchronous=NORMAL;")
         await conn.execute("PRAGMA temp_store=MEMORY;")
-        await conn.execute("PRAGMA cache_size=-20000;")  # 约 20MB page cache
+        # 通过负值设置 KB 为单位的 page cache 大小（默认为 4MB，可通过 DB_CACHE_KB 配置）
+        await conn.execute(f"PRAGMA cache_size={-int(DB_CACHE_KB)};")
     except Exception:
         pass
     try:
