@@ -73,6 +73,7 @@ async def handle_callback_query(update: Update, context: CallbackContext):
             time_key = mapping.get(data)
             if time_key:
                 context.user_data['time_filter'] = time_key
+                context.user_data['search_mode'] = 'fulltext'
                 if time_key == 'all':
                     await query.edit_message_text("🔍 已选择时间范围：全部\n请输入搜索关键词：")
                 else:
