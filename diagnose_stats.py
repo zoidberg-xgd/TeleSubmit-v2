@@ -187,7 +187,6 @@ async def diagnose():
         print("   1. 确保 Bot 是频道管理员")
         print("   2. 配置正确的 OWNER_ID")
         print("   3. 手动触发更新: 在机器人中发送 /hot 然后点击'🔄 刷新'")
-        print("   4. 或者在管理面板中点击'🔄 更新统计'")
         print()
     
     print("📚 更多信息:")

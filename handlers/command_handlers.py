@@ -128,9 +128,6 @@ async def help_command(update: Update, context: CallbackContext):
 /blacklist_remove &lt;ID&gt; - 移除黑名单
 /blacklist_list - 查看黑名单列表
 /searchuser &lt;ID&gt; - 查询用户投稿
-
-<b>💡 管理面板：</b>
-发送 /start 后点击"👑 管理面板"按钮
 """
     
     footer = """
