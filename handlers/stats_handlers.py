@@ -106,6 +106,16 @@ async def get_post_statistics(context: CallbackContext, message_id: int):
                 'forwards': forwards,
                 'reactions': reactions
             }
+        except BadRequest as e:
+            # 如果是 BadRequest 且错误信息包含 "message" 或 "invalid"，可能是消息被删除
+            error_msg = str(e).lower()
+            if "message" in error_msg or "invalid" in error_msg:
+                # 重新抛出异常，让调用者知道消息可能已被删除
+                logger.warning(f"帖子 {message_id} 可能已被删除: {e}")
+                raise
+            else:
+                logger.error(f"获取帖子 {message_id} 统计失败: {e}")
+                return None
         except Exception as e:
             logger.error(f"获取帖子 {message_id} 统计失败: {e}")
             return None
@@ -148,7 +158,24 @@ async def update_post_stats(context: CallbackContext):
                 related_ids_json = post['related_message_ids']
                 
                 # 获取主消息的统计信息
-                main_stats = await get_post_statistics(context, message_id)
+                try:
+                    main_stats = await get_post_statistics(context, message_id)
+                except BadRequest as e:
+                    # 如果 get_post_statistics 抛出 BadRequest，说明消息可能已被删除
+                    error_msg = str(e).lower()
+                    if "message" in error_msg or "invalid" in error_msg:
+                        # 标记为已删除
+                        await cursor.execute(
+                            "UPDATE published_posts SET is_deleted = 1 WHERE message_id = ?",
+                            (message_id,)
+                        )
+                        logger.info(f"检测到帖子 {message_id} 已被删除，已标记为已删除")
+                        failed_count += 1
+                    else:
+                        failed_count += 1
+                    # 避免API限制，每次请求后休眠
+                    await asyncio.sleep(1)
+                    continue
                 
                 if main_stats:
                     related_stats_list = []
@@ -160,9 +187,16 @@ async def update_post_stats(context: CallbackContext):
                             logger.info(f"帖子 {message_id} 有 {len(related_ids)} 个关联消息，使用智能算法计算热度")
                             
                             for related_id in related_ids:
-                                related_stats = await get_post_statistics(context, related_id)
-                                if related_stats:
-                                    related_stats_list.append(related_stats)
+                                try:
+                                    related_stats = await get_post_statistics(context, related_id)
+                                    if related_stats:
+                                        related_stats_list.append(related_stats)
+                                except BadRequest as e:
+                                    # 如果关联消息已被删除，跳过它
+                                    error_msg = str(e).lower()
+                                    if "message" in error_msg or "invalid" in error_msg:
+                                        logger.debug(f"关联消息 {related_id} 已被删除，跳过")
+                                    # 其他 BadRequest 错误也跳过
                                 await asyncio.sleep(1)  # 避免API限制
                                 
                         except json.JSONDecodeError:
@@ -204,7 +238,42 @@ async def update_post_stats(context: CallbackContext):
                     ))
                     updated_count += 1
                 else:
-                    failed_count += 1
+                    # 如果获取统计失败，检查消息是否被删除
+                    # 通过尝试转发消息来检查
+                    try:
+                        check_chat_id = OWNER_ID if OWNER_ID else context.bot.id
+                        forwarded_msg = await context.bot.forward_message(
+                            chat_id=check_chat_id,
+                            from_chat_id=CHANNEL_ID,
+                            message_id=message_id
+                        )
+                        # 如果转发成功，说明消息存在，只是获取统计失败
+                        # 删除转发的消息以保持整洁
+                        try:
+                            await context.bot.delete_message(
+                                chat_id=check_chat_id,
+                                message_id=forwarded_msg.message_id
+                            )
+                        except Exception:
+                            pass  # 删除失败不影响检查结果
+                        failed_count += 1
+                    except BadRequest as e:
+                        # 如果是 BadRequest 且错误信息包含 "message" 或 "invalid"，可能是消息被删除
+                        error_msg = str(e).lower()
+                        if "message" in error_msg or "invalid" in error_msg:
+                            # 标记为已删除
+                            await cursor.execute(
+                                "UPDATE published_posts SET is_deleted = 1 WHERE message_id = ?",
+                                (message_id,)
+                            )
+                            logger.info(f"检测到帖子 {message_id} 已被删除，已标记为已删除")
+                            failed_count += 1
+                        else:
+                            failed_count += 1
+                    except Exception as e:
+                        # 其他错误，只记录失败
+                        logger.warning(f"检查帖子 {message_id} 状态时出错: {e}")
+                        failed_count += 1
                 
                 # 避免API限制，每次请求后休眠
                 await asyncio.sleep(1)
@@ -291,9 +360,26 @@ async def get_hot_posts(update: Update, context: CallbackContext):
             await update.message.reply_text(f"📊 暂无{time_desc}热门帖子数据")
             return
         
-        # 由于已经在查询中过滤了 is_deleted = 0 的帖子，这里直接使用查询结果
-        # 不再需要额外的验证步骤，提高性能
-        valid_hot_posts = hot_posts
+        # 再次验证帖子是否仍然存在（防止并发问题）
+        # 批量检查消息ID是否已删除
+        message_ids = [post['message_id'] for post in hot_posts]
+        valid_hot_posts = []
+        
+        if message_ids:
+            async with get_db() as conn:
+                cursor = await conn.cursor()
+                # 使用 IN 查询批量检查
+                placeholders = ','.join('?' * len(message_ids))
+                await cursor.execute(
+                    f"SELECT message_id FROM published_posts WHERE message_id IN ({placeholders}) AND is_deleted = 0",
+                    message_ids
+                )
+                valid_message_ids = {row['message_id'] for row in await cursor.fetchall()}
+            
+            # 只保留未删除的帖子
+            for post in hot_posts:
+                if post['message_id'] in valid_message_ids:
+                    valid_hot_posts.append(post)
         
         if not valid_hot_posts:
             await update.message.reply_text(f"📊 暂无{time_desc}热门帖子数据（或所有结果已被删除）")
