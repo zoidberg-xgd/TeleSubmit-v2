@@ -137,13 +137,20 @@ analyze_memory.py
 fly.toml
 flyio.env.template
 deploy_fly.sh
+deploy_flyio.sh
 health.py
 FLYIO_*.md
 DEPLOYMENT_SUMMARY.md
 .dockerignore
 
-# Webhook 测试报告（临时）
+# Webhook 测试报告和调试文档（临时）
 WEBHOOK_TEST_REPORT.md
+WEBHOOK_DEBUG.md
+docs/WEBHOOK_DEBUG.md
+docs/verify_webhook.py
+docs/*_test.py
+docs/*_debug.py
+docs/*_verify.py
 
 # 其他临时文件
 *.pyc
