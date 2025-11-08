@@ -381,9 +381,9 @@ async def handle_delete_post(update: Update, context: CallbackContext):
         f"确定要删除消息 ID 为 <code>{message_id}</code> 的帖子记录吗？\n\n"
         "⚠️ 此操作将：\n"
         "• ✅ 从频道删除消息（双向同步删除）\n"
-        "• ✅ 从数据库删除记录\n"
+        "• ✅ 从数据库标记为已删除（保留历史数据）\n"
         "• ✅ 从搜索索引删除\n\n"
-        "此操作<b>不可恢复</b>！",
+        "💡 注意：数据会保留在数据库中，可通过数据库操作恢复",
         reply_markup=Keyboards.yes_no("delete_post", message_id),
         parse_mode=ParseMode.HTML
     )
@@ -636,7 +636,7 @@ async def execute_delete_post(query, message_id: str, context: CallbackContext):
                 response += "⚠️ 频道消息删除状态未知\n"
             
             # 数据库和索引删除状态
-            response += "✅ 从数据库删除记录\n"
+            response += "✅ 从数据库标记为已删除（保留历史数据）\n"
             if index_deleted:
                 response += f"✅ 从搜索索引删除" + (f"（包含 {related_count} 个关联消息）" if related_count > 0 else "") + "\n"
             else:

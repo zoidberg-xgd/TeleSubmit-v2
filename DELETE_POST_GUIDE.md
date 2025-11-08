@@ -5,11 +5,11 @@
 ## 功能概述
 
 帖子删除功能仅限 **OWNER（管理员）** 使用，用于管理已发布的投稿。删除操作会：
-- ✅ 从数据库中删除帖子记录
+- ✅ 标记数据库中的帖子为已删除（**标记删除，保留历史数据**）
 - ✅ 从搜索索引中删除
-- ❌ **不会**删除频道中的实际消息（需手动删除）
+- ✅ 尝试删除频道中的实际消息（如果机器人有权限）
 
-> **设计理念**：删除操作仅移除数据库记录与搜索索引，不自动删除频道消息。管理员可按需在频道手动删除，降低误删风险。
+> **设计理念**：采用**标记删除（Soft Delete）**机制，而非物理删除。删除操作会将帖子标记为已删除状态，但保留所有历史数据，便于后续恢复或审计。同时尝试删除频道消息，实现双向同步。
 
 ---
 
@@ -271,11 +271,11 @@ OWNER_ID = 123456789  # 替换为您的 Telegram 用户 ID
 
 ## 删除的帖子包括什么？
 
-删除操作会移除：
+删除操作会处理：
 
 1. **主帖子记录**
-   - 数据库中的 `published_posts` 表记录
-   - 搜索索引中的主帖子
+   - 数据库中的 `published_posts` 表记录会被标记为已删除（`is_deleted = 1`）
+   - 搜索索引中的主帖子会被物理删除
 
 2. **关联消息**（如果有）
    - 多媒体投稿可能包含多条频道消息
@@ -283,8 +283,10 @@ OWNER_ID = 123456789  # 替换为您的 Telegram 用户 ID
    - 数据库中的 `related_message_ids` 字段记录了这些关联消息
 
 3. **统计数据**
-   - 浏览量、转发量、热度等统计数据
-   - 这些数据随记录一起删除
+   - 浏览量、转发量、热度等统计数据**会保留在数据库中**
+   - 虽然帖子被标记为删除，但历史统计数据不会丢失
+
+> **重要说明**：删除操作采用标记删除机制，所有数据都会保留在数据库中，只是标记为已删除状态，不会出现在用户查询结果中。
 
 ---
 
@@ -308,7 +310,7 @@ OWNER_ID = 123456789  # 替换为您的 Telegram 用户 ID
 
 ### Q3: 删除操作可以撤销吗？
 
-**A:** 不可以。数据库删除操作是永久的，无法撤销。因此删除前会有二次确认。
+**A:** 可以部分恢复。由于采用标记删除机制，数据仍然保留在数据库中。如果需要恢复，可以通过数据库操作将 `is_deleted` 字段改回 `0`，然后重新添加到搜索索引。但频道消息如果已被删除则无法恢复。
 
 ### Q4: 批量删除时出现"未找到"是什么意思？
 
@@ -343,19 +345,151 @@ OWNER_ID = 123456789  # 替换为您的 Telegram 用户 ID
 
 ---
 
+## 删除功能实现原理
+
+### 标记删除机制（Soft Delete）
+
+TeleSubmit-v2 采用**标记删除（Soft Delete）**机制，而非物理删除（Hard Delete）。这种设计有以下优势：
+
+1. **数据保留**：所有历史数据都保留在数据库中，不会丢失
+2. **可恢复性**：误删的帖子可以通过数据库操作恢复
+3. **审计追踪**：可以追踪删除历史，了解哪些帖子被删除过
+4. **性能优化**：避免频繁的物理删除操作，提升数据库性能
+
+### 数据库字段设计
+
+`published_posts` 表包含一个 `is_deleted` 字段：
+
+```sql
+CREATE TABLE published_posts (
+    message_id INTEGER PRIMARY KEY,
+    -- ... 其他字段 ...
+    is_deleted INTEGER DEFAULT 0  -- 0=未删除, 1=已删除
+);
+```
+
+- `is_deleted = 0`：帖子正常状态，会出现在所有查询结果中
+- `is_deleted = 1`：帖子已删除，不会出现在用户查询结果中
+
+### 删除操作流程
+
+当执行删除操作时，系统会按以下步骤处理：
+
+1. **检查帖子状态**
+   ```python
+   # 检查是否已经标记为删除
+   if post_row.get('is_deleted', 0) == 1:
+       return "该帖子已被标记为删除"
+   ```
+
+2. **删除频道消息**（如果机器人有权限）
+   ```python
+   # 尝试删除主消息和关联消息
+   await context.bot.delete_message(chat_id=CHANNEL_ID, message_id=message_id)
+   ```
+
+3. **从搜索索引删除**
+   ```python
+   # 物理删除搜索索引中的记录
+   search_engine.delete_post(message_id)
+   for related_id in related_message_ids:
+       search_engine.delete_post(related_id)
+   ```
+
+4. **标记数据库记录为已删除**
+   ```sql
+   -- 标记删除，而非物理删除
+   UPDATE published_posts SET is_deleted = 1 WHERE rowid = ?;
+   ```
+
+### 查询过滤机制
+
+所有用户面向的查询都会自动过滤已删除的帖子：
+
+#### 搜索功能
+```python
+# 搜索时过滤已删除的帖子
+await cursor.execute(
+    "SELECT message_id FROM published_posts WHERE message_id IN (...) AND is_deleted = 0",
+    message_ids
+)
+```
+
+#### 统计功能
+```python
+# 统计时只计算未删除的帖子
+query = "SELECT * FROM published_posts WHERE is_deleted = 0"
+```
+
+#### 用户投稿列表
+```python
+# 我的投稿中不显示已删除的帖子
+await cursor.execute(
+    "SELECT * FROM published_posts WHERE user_id = ? AND is_deleted = 0",
+    (user_id,)
+)
+```
+
+#### 热门帖子
+```python
+# 热门帖子统计时过滤已删除的帖子
+await cursor.execute(
+    "SELECT * FROM published_posts WHERE is_deleted = 0 AND publish_time > ?",
+    (cutoff_time,)
+)
+```
+
+### 数据保留策略
+
+- **数据库记录**：永久保留，仅标记删除状态
+- **搜索索引**：物理删除，提升搜索性能
+- **统计数据**：保留在数据库中，可用于历史分析
+- **频道消息**：如果机器人有权限，会尝试删除；否则保留
+
+### 索引优化
+
+为了提高查询性能，系统在 `is_deleted` 字段上创建了索引：
+
+```sql
+CREATE INDEX IF NOT EXISTS idx_is_deleted ON published_posts(is_deleted);
+```
+
+这样在过滤已删除帖子时，查询性能会显著提升。
+
+### 双向同步机制
+
+系统支持双向同步删除：
+
+1. **机器人删除 → 频道同步**：当通过机器人删除帖子时，会尝试删除频道中的消息
+2. **频道删除 → 数据库同步**：当频道消息被手动删除时，系统会检测并标记数据库记录为已删除
+
+频道监听器会定期检查消息是否存在：
+```python
+async def check_and_handle_deleted_message(message_id: int, context: CallbackContext):
+    # 检查消息是否仍然存在于频道中
+    # 如果不存在，标记为已删除
+    await cursor.execute("UPDATE published_posts SET is_deleted = 1 WHERE message_id=?", (message_id,))
+```
+
 ## 技术实现细节
 
 ### 数据库操作
 
 ```sql
--- 删除帖子记录
-DELETE FROM published_posts WHERE message_id = ?;
+-- 标记删除（实际实现）
+UPDATE published_posts SET is_deleted = 1 WHERE rowid = ?;
+
+-- 查询时过滤已删除的帖子
+SELECT * FROM published_posts WHERE is_deleted = 0 AND ...;
+
+-- 恢复已删除的帖子（手动操作）
+UPDATE published_posts SET is_deleted = 0 WHERE message_id = ?;
 ```
 
 ### 搜索索引操作
 
 ```python
-# 从搜索引擎删除
+# 从搜索引擎物理删除（搜索索引采用物理删除）
 search_engine.delete_post(message_id)
 
 # 删除关联消息
@@ -367,18 +501,36 @@ for related_id in related_message_ids:
 
 所有删除操作都会记录在日志中：
 ```
-INFO: 批量删除：已删除帖子 message_id=123
+INFO: 已标记帖子为已删除: ID=45, message_id=123
 INFO: 已从搜索索引删除帖子: 123
-INFO: 已从数据库删除帖子记录: ID=45, message_id=123
+INFO: 已从频道删除消息: 123
 ```
+
+### 恢复已删除的帖子
+
+如果需要恢复已删除的帖子，可以执行以下操作：
+
+1. **恢复数据库标记**
+   ```sql
+   UPDATE published_posts SET is_deleted = 0 WHERE message_id = ?;
+   ```
+
+2. **重新添加到搜索索引**（需要手动实现）
+   ```python
+   # 获取帖子信息
+   post = await get_post_by_message_id(message_id)
+   # 重新添加到搜索索引
+   search_engine.add_post(post)
+   ```
 
 ---
 
 ## 安全建议
 
 1. **定期备份数据库**
-   - 删除操作不可逆，建议定期备份 `data/bot.db`
+   - 虽然采用标记删除，但建议定期备份 `data/bot.db`
    - 使用 `sqlite3` 工具导出数据
+   - 标记删除的数据也会包含在备份中，便于恢复
 
 2. **谨慎使用批量删除**
    - 批量删除前先确认 ID 范围
@@ -409,6 +561,15 @@ INFO: 已从数据库删除帖子记录: ID=45, message_id=123
 
 ## 更新日志
 
+### v2.1.0 (2025-11-08)
+- 🔄 **重大改进**：采用标记删除（Soft Delete）机制替代物理删除
+- 💾 所有历史数据保留在数据库中，支持数据恢复
+- 🔍 所有用户查询自动过滤已删除的帖子（`is_deleted = 0`）
+- 📊 统计数据保留，可用于历史分析
+- 🔄 支持双向同步删除（机器人删除 ↔ 频道删除）
+- ⚡ 添加 `is_deleted` 字段索引，提升查询性能
+- 🛡️ 添加删除状态检查，避免重复删除
+
 ### v2.0.0 (2025-10-25)
 - ✨ 新增搜索结果中的删除按钮
 - ✨ 新增 /myposts 中的删除按钮（OWNER 专用）
@@ -438,5 +599,5 @@ INFO: 已从数据库删除帖子记录: ID=45, message_id=123
 
 ---
 
-**最后更新**: 2025-10-25  
-**版本**: v2.0.0
+**最后更新**: 2025-11-08  
+**版本**: v2.1.0

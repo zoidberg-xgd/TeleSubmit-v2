@@ -687,7 +687,7 @@ async def save_channel_message(message_info: dict):
             
             # 先删除索引中可能存在的旧记录（确保索引和数据库一致）
             # 这可以处理以下情况：
-            # 1. 删除操作从数据库删除了记录，但索引删除失败
+            # 1. 删除操作标记为已删除，但索引删除失败
             # 2. 频道消息仍然存在，频道监听器重新保存到数据库
             # 3. 需要确保索引中不存在旧记录，避免重复或冲突
             try:
@@ -736,14 +736,14 @@ async def save_channel_message(message_info: dict):
 
 async def delete_channel_post_from_db(message_id: int, context: CallbackContext = None):
     """
-    从数据库和搜索索引中删除频道消息
+    标记频道消息为已删除（保留历史数据）并从搜索索引中删除
     
     Args:
         message_id: 频道消息ID
         context: 回调上下文（可选，用于获取 bot 实例）
         
     Returns:
-        bool: 是否成功删除
+        bool: 是否成功标记为已删除
     """
     try:
         from database.db_manager import get_db
@@ -800,17 +800,17 @@ async def delete_channel_post_from_db(message_id: int, context: CallbackContext 
 
 async def check_and_handle_deleted_message(message_id: int, context: CallbackContext):
     """
-    检查消息是否被删除，如果被删除则从数据库删除记录
+    检查消息是否被删除，如果被删除则标记为已删除（保留历史数据）
     
     通过尝试转发消息来检查消息是否存在。如果消息不存在（被删除），
-    会抛出异常，此时从数据库删除记录。
+    会抛出异常，此时标记为已删除（is_deleted = 1），保留历史数据。
     
     Args:
         message_id: 频道消息ID
         context: 回调上下文
         
     Returns:
-        bool: 如果消息被删除并成功从数据库删除，返回 True；否则返回 False
+        bool: 如果消息被删除并成功标记为已删除，返回 True；否则返回 False
     """
     try:
         from config.settings import CHANNEL_ID
@@ -848,7 +848,7 @@ async def check_and_handle_deleted_message(message_id: int, context: CallbackCon
             if ('message not found' in error_msg or 
                 'message to forward not found' in error_msg or
                 'bad request' in error_msg and 'not found' in error_msg):
-                logger.info(f"检测到频道消息 {message_id} 已被删除，开始删除数据库记录")
+                logger.info(f"检测到频道消息 {message_id} 已被删除，开始标记为已删除")
                 return await delete_channel_post_from_db(message_id, context)
             else:
                 # 其他 BadRequest 错误（可能是权限问题等），记录但不删除
@@ -868,7 +868,7 @@ async def check_and_handle_deleted_message(message_id: int, context: CallbackCon
 async def check_deleted_messages_periodic(context: CallbackContext):
     """
     定期检查数据库中的消息是否仍然存在于频道中
-    如果消息已被删除，则从数据库和搜索索引中删除记录
+    如果消息已被删除，则标记为已删除（保留历史数据）并从搜索索引中删除
     
     Args:
         context: 回调上下文
@@ -910,7 +910,7 @@ async def check_deleted_messages_periodic(context: CallbackContext):
                     continue
             
             if deleted_count > 0:
-                logger.info(f"定期检查完成：发现并删除了 {deleted_count} 条已删除的消息")
+                logger.info(f"定期检查完成：发现并标记了 {deleted_count} 条已删除的消息")
             else:
                 logger.debug("定期检查完成：未发现已删除的消息")
                 
