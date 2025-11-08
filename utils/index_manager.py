@@ -159,7 +159,7 @@ class IndexManager:
             conn = await aiosqlite.connect(DB_PATH)
             conn.row_factory = aiosqlite.Row
             
-            cursor = await conn.execute('SELECT message_id FROM published_posts')
+            cursor = await conn.execute('SELECT message_id FROM published_posts WHERE is_deleted = 0')
             db_message_ids = {str(row['message_id']) for row in await cursor.fetchall()}
             
             # 2. 获取索引中的所有 message_id

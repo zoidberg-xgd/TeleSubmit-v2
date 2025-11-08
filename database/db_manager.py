@@ -81,15 +81,25 @@ async def init_db():
                     reactions INTEGER DEFAULT 0,
                     heat_score REAL DEFAULT 0,
                     last_update REAL,
-                    related_message_ids TEXT
+                    related_message_ids TEXT,
+                    is_deleted INTEGER DEFAULT 0
                 )
             ''')
+            
+            # 添加 is_deleted 字段（如果表已存在但没有该字段）
+            try:
+                await conn.execute('ALTER TABLE published_posts ADD COLUMN is_deleted INTEGER DEFAULT 0')
+                logger.info("已添加 is_deleted 字段到 published_posts 表")
+            except Exception:
+                # 字段已存在，忽略错误
+                pass
             
             # 创建索引以提升查询性能
             await conn.execute('CREATE INDEX IF NOT EXISTS idx_heat_score ON published_posts(heat_score DESC)')
             await conn.execute('CREATE INDEX IF NOT EXISTS idx_publish_time ON published_posts(publish_time DESC)')
             await conn.execute('CREATE INDEX IF NOT EXISTS idx_user_id ON published_posts(user_id)')
             await conn.execute('CREATE INDEX IF NOT EXISTS idx_tags ON published_posts(tags)')
+            await conn.execute('CREATE INDEX IF NOT EXISTS idx_is_deleted ON published_posts(is_deleted)')
             
             await conn.commit()
             logger.info("数据库初始化完成")

@@ -89,7 +89,10 @@ from handlers.search_handlers import (
     handle_search_input
 )
 # 频道消息监听器
-from handlers.channel_listener import handle_channel_message
+from handlers.channel_listener import (
+    handle_channel_message,
+    check_deleted_messages_periodic
+)
 from handlers.index_handlers import (
     rebuild_index_command,
     sync_index_command,
@@ -140,6 +143,17 @@ async def check_conversation_timeout(update: Update, context: CallbackContext) -
         update: Telegram 更新对象
         context: 回调上下文
     """
+    # 排除频道消息和频道回复
+    if update.channel_post or update.edited_channel_post:
+        return
+    
+    # 检查是否是频道或群组中的消息（通过 chat.type 判断）
+    if update.message and update.message.chat:
+        chat_type = getattr(update.message.chat, 'type', None)
+        if chat_type in ('channel', 'supergroup', 'group'):
+            # 对于频道和群组，不进行会话超时检查
+            return
+    
     if not update.effective_user:
         return
     
@@ -377,7 +391,16 @@ async def main():
     else:
         # Polling 模式（默认）
         logger.info("🔄 启动 Polling 模式...")
-        await application.updater.start_polling(allowed_updates=None)
+        # 明确指定需要接收的更新类型，包括频道消息
+        allowed_updates = [
+            "message",           # 普通消息
+            "edited_message",    # 编辑的消息
+            "channel_post",      # 频道消息（重要！）
+            "edited_channel_post",  # 编辑的频道消息
+            "callback_query",   # 回调查询
+            "inline_query",      # 内联查询
+        ]
+        await application.updater.start_polling(allowed_updates=allowed_updates)
         logger.info("✅ Polling 模式已启动")
     
     # 添加事件处理器以便优雅关闭
@@ -599,7 +622,14 @@ def setup_application(application):
         
         # 添加帖子统计数据更新任务（默认每2小时执行一次，降低峰值）
         job_queue.run_repeating(update_post_stats, interval=7200, first=60)
-        logger.info("定期任务设置完成（包括统计数据更新）")
+        
+        # 添加定期检查已删除消息的任务（每30分钟检查一次）
+        job_queue.run_repeating(
+            check_deleted_messages_periodic,
+            interval=1800,  # 30分钟
+            first=300  # 启动后5分钟开始第一次检查
+        )
+        logger.info("定期任务设置完成（包括统计数据更新和删除消息检查）")
     except Exception as e:
         logger.error(f"设置定期任务失败: {e}", exc_info=True)
     

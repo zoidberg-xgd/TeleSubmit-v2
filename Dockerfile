@@ -19,13 +19,18 @@ ENV PYTHONUNBUFFERED=1 \
 # 安装系统依赖
 # gcc 和 python3-dev 用于编译 Whoosh 等 Python 包
 # 注意：apt-get 不使用代理，直接连接 Debian 源
+# 分步安装以减少内存占用
 RUN HTTP_PROXY="" HTTPS_PROXY="" http_proxy="" https_proxy="" apt-get update && \
     HTTP_PROXY="" HTTPS_PROXY="" http_proxy="" https_proxy="" apt-get install -y --no-install-recommends \
-    tzdata \
+    tzdata && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN HTTP_PROXY="" HTTPS_PROXY="" http_proxy="" https_proxy="" apt-get update && \
+    HTTP_PROXY="" HTTPS_PROXY="" http_proxy="" https_proxy="" apt-get install -y --no-install-recommends \
     gcc \
     g++ \
-    python3-dev \
-    && rm -rf /var/lib/apt/lists/*
+    python3-dev && \
+    rm -rf /var/lib/apt/lists/*
 
 # 复制依赖文件并安装
 COPY requirements.txt .

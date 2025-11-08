@@ -7,6 +7,7 @@ import asyncio
 from datetime import datetime, timedelta
 from telegram import Update
 from telegram.ext import CallbackContext
+from telegram.error import BadRequest, TelegramError
 
 from config.settings import CHANNEL_ID, OWNER_ID
 from database.db_manager import get_db
@@ -130,10 +131,10 @@ async def update_post_stats(context: CallbackContext):
         async with get_db() as conn:
             cursor = await conn.cursor()
             
-            # 获取最近30天的帖子（避免过度请求API）
+            # 获取最近30天的帖子（避免过度请求API，过滤已删除的帖子）
             cutoff_time = (datetime.now() - timedelta(days=30)).timestamp()
             await cursor.execute(
-                "SELECT message_id, publish_time, related_message_ids FROM published_posts WHERE publish_time > ?",
+                "SELECT message_id, publish_time, related_message_ids FROM published_posts WHERE publish_time > ? AND is_deleted = 0",
                 (cutoff_time,)
             )
             posts = await cursor.fetchall()
@@ -254,7 +255,8 @@ async def get_hot_posts(update: Update, context: CallbackContext):
         
         # 构建查询 - 只查询主贴（有标题或至少有内容的帖子）
         # published_posts 表中存储的都是主贴，不包含多组媒体的后续消息
-        query = "SELECT * FROM published_posts WHERE 1=1"
+        # 过滤已删除的帖子
+        query = "SELECT * FROM published_posts WHERE is_deleted = 0"
         query_params = []
         
         # 时间过滤
@@ -289,10 +291,18 @@ async def get_hot_posts(update: Update, context: CallbackContext):
             await update.message.reply_text(f"📊 暂无{time_desc}热门帖子数据")
             return
         
-        # 构建消息 - 优化显示格式
-        message = f"🔥 <b>{time_desc}热门帖子 TOP {len(hot_posts)}</b>\n\n"
+        # 由于已经在查询中过滤了 is_deleted = 0 的帖子，这里直接使用查询结果
+        # 不再需要额外的验证步骤，提高性能
+        valid_hot_posts = hot_posts
         
-        for idx, post in enumerate(hot_posts, 1):
+        if not valid_hot_posts:
+            await update.message.reply_text(f"📊 暂无{time_desc}热门帖子数据（或所有结果已被删除）")
+            return
+        
+        # 构建消息 - 优化显示格式
+        message = f"🔥 <b>{time_desc}热门帖子 TOP {len(valid_hot_posts)}</b>\n\n"
+        
+        for idx, post in enumerate(valid_hot_posts, 1):
             # 生成帖子链接
             if CHANNEL_ID.startswith('@'):
                 channel_username = CHANNEL_ID.lstrip('@')
@@ -443,9 +453,9 @@ async def get_user_stats(update: Update, context: CallbackContext):
         async with get_db() as conn:
             cursor = await conn.cursor()
             
-            # 获取用户的所有投稿
+            # 获取用户的所有投稿（过滤已删除的帖子）
             await cursor.execute(
-                "SELECT * FROM published_posts WHERE user_id = ? ORDER BY publish_time DESC",
+                "SELECT * FROM published_posts WHERE user_id = ? AND is_deleted = 0 ORDER BY publish_time DESC",
                 (user_id,)
             )
             user_posts = await cursor.fetchall()

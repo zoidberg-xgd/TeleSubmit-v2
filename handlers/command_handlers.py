@@ -155,6 +155,19 @@ async def help_command(update: Update, context: CallbackContext):
 
 async def handle_menu_shortcuts(update: Update, context: CallbackContext) -> None:
     """处理底部菜单（ReplyKeyboard）文本，映射到实际命令。"""
+    # 排除频道消息
+    if update.channel_post or update.edited_channel_post:
+        return
+    
+    # 检查是否是频道或群组
+    if update.message and update.message.chat:
+        chat_type = getattr(update.message.chat, 'type', None)
+        if chat_type == 'channel':
+            return
+    
+    if not update.message:
+        return
+    
     text = (update.message.text or "").strip()
     try:
         # 如果处于搜索输入模式，优先交给搜索输入处理
@@ -382,6 +395,16 @@ async def catch_all(update: Update, context: CallbackContext):
         update: Telegram 更新对象
         context: 回调上下文
     """
+    # 排除频道消息（频道消息由专门的处理器处理）
+    if update.channel_post or update.edited_channel_post:
+        return
+    
+    # 检查是否是频道或群组
+    if update.message and update.message.chat:
+        chat_type = getattr(update.message.chat, 'type', None)
+        if chat_type == 'channel':
+            return
+    
     logger.debug(f"收到未知消息: {update}")
 
 async def blacklist_add(update: Update, context: CallbackContext):

@@ -60,9 +60,35 @@ class WebhookServer:
             update = Update.de_json(data, self.application.bot)
             
             if update:
+                # 记录更新类型（特别是频道消息）
+                update_types = []
+                if update.message:
+                    update_types.append("message")
+                if update.edited_message:
+                    update_types.append("edited_message")
+                if update.channel_post:
+                    update_types.append("channel_post")
+                if update.edited_channel_post:
+                    update_types.append("edited_channel_post")
+                if update.callback_query:
+                    update_types.append("callback_query")
+                if update.inline_query:
+                    update_types.append("inline_query")
+                
+                update_type_str = ", ".join(update_types) if update_types else "unknown"
+                
+                # 如果是频道消息，使用info级别日志
+                if update.channel_post or update.edited_channel_post:
+                    logger.info(f"📢 收到频道消息更新: update_id={update.update_id}, type={update_type_str}")
+                    if update.channel_post:
+                        logger.info(f"   频道消息ID: {update.channel_post.message_id}, chat_id: {update.channel_post.chat.id if update.channel_post.chat else 'unknown'}")
+                    if update.edited_channel_post:
+                        logger.info(f"   编辑的频道消息ID: {update.edited_channel_post.message_id}, chat_id: {update.edited_channel_post.chat.id if update.edited_channel_post.chat else 'unknown'}")
+                else:
+                    logger.debug(f"收到 Webhook 更新: update_id={update.update_id}, type={update_type_str}")
+                
                 # 将 update 放入队列处理
                 await self.application.update_queue.put(update)
-                logger.debug(f"收到 Webhook 更新: {update.update_id}")
             else:
                 logger.warning(f"无法解析 Webhook 数据: {data}")
             
@@ -127,16 +153,46 @@ async def setup_webhook(application, webhook_url: str, webhook_path: str, secret
         logger.info("已删除现有 Webhook")
         
         # 设置新的 webhook
+        # 明确指定需要接收的更新类型，包括频道消息
+        allowed_updates = [
+            "message",           # 普通消息
+            "edited_message",    # 编辑的消息
+            "channel_post",      # 频道消息（重要！）
+            "edited_channel_post",  # 编辑的频道消息
+            "callback_query",   # 回调查询
+            "inline_query",      # 内联查询
+        ]
         success = await application.bot.set_webhook(
             url=full_webhook_url,
             secret_token=secret_token,
-            allowed_updates=None,  # 接收所有类型的更新
+            allowed_updates=allowed_updates,  # 明确指定接收频道消息
             drop_pending_updates=True
         )
         
         if success:
             logger.info(f"✅ Webhook 设置成功: {full_webhook_url}")
             logger.info(f"✅ Secret Token: {secret_token}")
+            logger.info(f"✅ Allowed Updates: {', '.join(allowed_updates)}")
+            
+            # 验证 webhook 信息
+            try:
+                webhook_info = await application.bot.get_webhook_info()
+                logger.info(f"✅ Webhook 验证信息:")
+                logger.info(f"   URL: {webhook_info.url}")
+                logger.info(f"   待处理更新数: {webhook_info.pending_update_count}")
+                logger.info(f"   Allowed Updates: {webhook_info.allowed_updates}")
+                if webhook_info.allowed_updates:
+                    has_channel_post = "channel_post" in webhook_info.allowed_updates
+                    has_edited_channel_post = "edited_channel_post" in webhook_info.allowed_updates
+                    logger.info(f"   ✅ 包含 channel_post: {has_channel_post}")
+                    logger.info(f"   ✅ 包含 edited_channel_post: {has_edited_channel_post}")
+                    if not (has_channel_post and has_edited_channel_post):
+                        logger.warning("⚠️  警告: Webhook 配置中缺少频道消息类型！")
+                else:
+                    logger.warning("⚠️  警告: Webhook 配置中没有 allowed_updates，将接收所有更新类型")
+            except Exception as e:
+                logger.warning(f"无法获取 Webhook 信息: {e}")
+            
             return True
         else:
             logger.error(f"❌ Webhook 设置失败")

@@ -292,7 +292,7 @@ async def handle_view_post(update: Update, context: CallbackContext):
         async with get_db() as conn:
             c = await conn.cursor()
             await c.execute(
-                "SELECT message_id FROM published_posts WHERE id=?",
+                "SELECT message_id FROM published_posts WHERE id=? AND is_deleted = 0",
                 (post_id,)
             )
             row = await c.fetchone()
@@ -380,9 +380,9 @@ async def handle_delete_post(update: Update, context: CallbackContext):
         "⚠️ <b>删除确认</b>\n\n"
         f"确定要删除消息 ID 为 <code>{message_id}</code> 的帖子记录吗？\n\n"
         "⚠️ 此操作将：\n"
+        "• ✅ 从频道删除消息（双向同步删除）\n"
         "• ✅ 从数据库删除记录\n"
-        "• ✅ 从搜索索引删除\n"
-        "• ❌ <b>不会</b>删除频道消息（需手动删除）\n\n"
+        "• ✅ 从搜索索引删除\n\n"
         "此操作<b>不可恢复</b>！",
         reply_markup=Keyboards.yes_no("delete_post", message_id),
         parse_mode=ParseMode.HTML
@@ -424,7 +424,7 @@ async def handle_user_info(update: Update, context: CallbackContext):
         async with get_db() as conn:
             c = await conn.cursor()
             await c.execute(
-                "SELECT COUNT(*) as count FROM published_posts WHERE user_id=?",
+                "SELECT COUNT(*) as count FROM published_posts WHERE user_id=? AND is_deleted = 0",
                 (target_user_id,)
             )
             row = await c.fetchone()
@@ -519,9 +519,9 @@ async def execute_delete_post(query, message_id: str, context: CallbackContext):
         async with get_db() as conn:
             cursor = await conn.cursor()
             
-            # 根据 message_id 获取帖子信息
+            # 根据 message_id 获取帖子信息（包括已删除的帖子，用于检查状态）
             await cursor.execute(
-                "SELECT rowid AS post_id, message_id, related_message_ids FROM published_posts WHERE message_id=?",
+                "SELECT rowid AS post_id, message_id, related_message_ids, is_deleted FROM published_posts WHERE message_id=?",
                 (int(message_id),)
             )
             post_row = await cursor.fetchone()
@@ -531,8 +531,59 @@ async def execute_delete_post(query, message_id: str, context: CallbackContext):
                 logger.warning(f"尝试删除不存在的帖子: message_id={message_id}")
                 return
             
+            # 检查是否已经标记为删除
+            if post_row.get('is_deleted', 0) == 1:
+                await query.edit_message_text("ℹ️ 该帖子已被标记为删除")
+                logger.info(f"帖子 {message_id} 已经被标记为删除")
+                return
+            
             post_id = post_row['post_id']
             related_ids_json = post_row['related_message_ids']
+            
+            # 先尝试删除频道消息（双向同步删除）
+            from config.settings import CHANNEL_ID
+            channel_deleted = False
+            related_channel_deleted = 0
+            channel_delete_failed = False
+            
+            try:
+                # 尝试删除主消息
+                try:
+                    await context.bot.delete_message(chat_id=CHANNEL_ID, message_id=int(message_id))
+                    channel_deleted = True
+                    logger.info(f"已从频道删除消息: {message_id}")
+                except Exception as e:
+                    error_msg = str(e).lower()
+                    if "message to delete not found" in error_msg or "message can't be deleted" in error_msg:
+                        # 消息已不存在或被删除，这是正常的
+                        logger.info(f"频道消息 {message_id} 已不存在或无法删除: {e}")
+                        channel_deleted = True  # 视为成功，因为目标已达成
+                    else:
+                        logger.warning(f"删除频道消息 {message_id} 失败: {e}")
+                        channel_delete_failed = True
+                
+                # 尝试删除关联消息
+                if related_ids_json:
+                    import json
+                    try:
+                        related_ids = json.loads(related_ids_json)
+                        for related_id in related_ids:
+                            try:
+                                await context.bot.delete_message(chat_id=CHANNEL_ID, message_id=int(related_id))
+                                related_channel_deleted += 1
+                                logger.info(f"已从频道删除关联消息: {related_id}")
+                            except Exception as e:
+                                error_msg = str(e).lower()
+                                if "message to delete not found" in error_msg or "message can't be deleted" in error_msg:
+                                    related_channel_deleted += 1  # 视为成功
+                                    logger.debug(f"关联消息 {related_id} 已不存在")
+                                else:
+                                    logger.warning(f"删除关联消息 {related_id} 失败: {e}")
+                    except json.JSONDecodeError:
+                        logger.warning(f"解析关联消息ID失败: {related_ids_json}")
+            except Exception as e:
+                logger.error(f"删除频道消息时出错: {e}")
+                channel_delete_failed = True
             
             # 从搜索索引中删除
             index_deleted = False
@@ -560,24 +611,36 @@ async def execute_delete_post(query, message_id: str, context: CallbackContext):
                 logger.error(f"从搜索索引删除失败: {e}")
                 # 继续执行，不因索引删除失败而中断
             
-            # 从数据库删除记录
-            await cursor.execute("DELETE FROM published_posts WHERE rowid=?", (post_id,))
+            # 标记为已删除而不是直接删除记录（保留历史数据）
+            await cursor.execute("UPDATE published_posts SET is_deleted = 1 WHERE rowid=?", (post_id,))
             await conn.commit()
-            logger.info(f"已从数据库删除帖子记录: ID={post_id}, message_id={message_id}")
+            logger.info(f"已标记帖子为已删除: ID={post_id}, message_id={message_id}")
             
             # 构建响应消息
-            from config.settings import CHANNEL_ID
             channel_link = f"https://t.me/{CHANNEL_ID.lstrip('@')}/{message_id}" if CHANNEL_ID.startswith('@') else f"消息ID: {message_id}"
             
             response = "✅ <b>删除操作完成</b>\n\n"
             response += f"📝 消息ID: <code>{message_id}</code>\n"
             response += f"🔗 频道链接: {channel_link}\n\n"
             response += "<b>已完成：</b>\n"
+            
+            # 频道消息删除状态
+            if channel_deleted:
+                if related_channel_deleted > 0:
+                    response += f"✅ 从频道删除消息（包含 {related_channel_deleted} 个关联消息）\n"
+                else:
+                    response += "✅ 从频道删除消息\n"
+            elif channel_delete_failed:
+                response += "⚠️ 频道消息删除失败（可能无权限或消息已不存在）\n"
+            else:
+                response += "⚠️ 频道消息删除状态未知\n"
+            
+            # 数据库和索引删除状态
             response += "✅ 从数据库删除记录\n"
-            response += f"✅ 从搜索索引删除" + (f"（包含 {related_count} 个关联消息）" if related_count > 0 else "") + "\n\n" if index_deleted else "⚠️ 搜索索引删除失败\n\n"
-            response += "<b>⚠️ 注意：</b>\n"
-            response += "频道中的消息<b>未被删除</b>，如需删除请手动操作。\n"
-            response += f"可以直接访问上方链接或在频道中查找消息 ID <code>{message_id}</code> 进行删除。"
+            if index_deleted:
+                response += f"✅ 从搜索索引删除" + (f"（包含 {related_count} 个关联消息）" if related_count > 0 else "") + "\n"
+            else:
+                response += "⚠️ 搜索索引删除失败\n"
             
             await query.edit_message_text(response, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
             

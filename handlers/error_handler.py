@@ -89,7 +89,20 @@ async def error_handler(update: Update, context: CallbackContext) -> None:
             return
     
     # 对于其他错误，尝试通知用户（如果可能）
+    # 但不要向频道发送错误消息（bot 可能没有权限，且频道消息不应该触发用户交互）
     if update and update.effective_chat:
+        # 排除频道消息
+        if update.channel_post or update.edited_channel_post:
+            logger.debug("错误发生在频道消息处理中，不发送错误通知")
+            return
+        
+        # 检查是否是频道或群组
+        if update.message and update.message.chat:
+            chat_type = getattr(update.message.chat, 'type', None)
+            if chat_type == 'channel':
+                logger.debug("错误发生在频道中，不发送错误通知")
+                return
+        
         try:
             await update.effective_chat.send_message(
                 "❌ 抱歉，处理您的请求时发生了错误。请稍后再试，或发送 /cancel 取消当前会话，然后发送 /start 重新开始。"

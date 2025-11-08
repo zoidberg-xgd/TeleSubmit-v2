@@ -6,6 +6,7 @@ import logging
 from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext
+from telegram.error import BadRequest, TelegramError
 from whoosh.query import DateRange
 
 from config.settings import CHANNEL_ID, OWNER_ID
@@ -156,16 +157,45 @@ async def search_posts(update: Update, context: CallbackContext):
             )
             return
         
+        # 验证搜索结果是否仍然存在于频道中（过滤已删除的帖子）
+        # 通过检查数据库中的 is_deleted 字段来过滤已删除的帖子
+        valid_hits = []
+        
+        # 批量检查消息ID是否已删除
+        message_ids = [hit.message_id for hit in search_result.hits]
+        if message_ids:
+            async with get_db() as conn:
+                cursor = await conn.cursor()
+                # 使用 IN 查询批量检查
+                placeholders = ','.join('?' * len(message_ids))
+                await cursor.execute(
+                    f"SELECT message_id FROM published_posts WHERE message_id IN ({placeholders}) AND is_deleted = 0",
+                    message_ids
+                )
+                valid_message_ids = {row['message_id'] for row in await cursor.fetchall()}
+            
+            # 只保留未删除的帖子
+            for hit in search_result.hits:
+                if hit.message_id in valid_message_ids:
+                    valid_hits.append(hit)
+        
+        if not valid_hits:
+            search_desc = f"标签 #{tag_filter}" if is_tag_search else f"关键词 \"{keyword}\""
+            await update.message.reply_text(
+                f"🔍 未找到匹配{time_desc}{search_desc}的帖子（或所有结果已被删除）"
+            )
+            return
+        
         # 构建结果消息
         search_desc = f"#{tag_filter}" if is_tag_search else f"\"{keyword}\""
         time_prefix = f"{time_desc} " if time_desc else ""
         message = f"🔍 搜索结果：{time_prefix}{search_desc}\n"
-        message += f"找到 {search_result.total_results} 个结果（显示前 {len(search_result.hits)} 个）\n\n"
+        message += f"找到 {len(valid_hits)} 个结果（显示前 {len(valid_hits)} 个）\n\n"
         
         # 存储消息ID用于删除按钮
         message_ids = []
         
-        for idx, hit in enumerate(search_result.hits, 1):
+        for idx, hit in enumerate(valid_hits, 1):
             # 生成帖子链接
             if CHANNEL_ID.startswith('@'):
                 channel_username = CHANNEL_ID.lstrip('@')
@@ -245,6 +275,19 @@ async def search_posts(update: Update, context: CallbackContext):
 
 async def handle_search_input(update: Update, context: CallbackContext):
     """在选择了搜索模式后，接收用户输入的关键词/标签并执行搜索。"""
+    # 排除频道消息
+    if update.channel_post or update.edited_channel_post:
+        return
+    
+    # 检查是否是频道或群组
+    if update.message and update.message.chat:
+        chat_type = getattr(update.message.chat, 'type', None)
+        if chat_type == 'channel':
+            return
+    
+    if not update.message:
+        return
+    
     mode = context.user_data.get('search_mode')
     if not mode:
         return  # 未处于搜索输入模式，交给其他处理器
@@ -309,11 +352,41 @@ async def search_posts_by_tag(update: Update, context: CallbackContext, tag: str
                 await update.message.reply_text(f"🔍 未找到标签 #{tag} 的帖子")
             return
         
+        # 验证搜索结果是否仍然存在于频道中（过滤已删除的帖子）
+        # 通过检查数据库中的 is_deleted 字段来过滤已删除的帖子
+        valid_hits = []
+        
+        # 批量检查消息ID是否已删除
+        message_ids = [hit.message_id for hit in search_result.hits]
+        if message_ids:
+            async with get_db() as conn:
+                cursor = await conn.cursor()
+                # 使用 IN 查询批量检查
+                placeholders = ','.join('?' * len(message_ids))
+                await cursor.execute(
+                    f"SELECT message_id FROM published_posts WHERE message_id IN ({placeholders}) AND is_deleted = 0",
+                    message_ids
+                )
+                valid_message_ids = {row['message_id'] for row in await cursor.fetchall()}
+            
+            # 只保留未删除的帖子
+            for hit in search_result.hits:
+                if hit.message_id in valid_message_ids:
+                    valid_hits.append(hit)
+        
+        if not valid_hits:
+            # 根据update类型选择回复方式
+            if hasattr(update, 'callback_query') and update.callback_query:
+                await update.callback_query.message.reply_text(f"🔍 未找到标签 #{tag} 的帖子（或所有结果已被删除）")
+            else:
+                await update.message.reply_text(f"🔍 未找到标签 #{tag} 的帖子（或所有结果已被删除）")
+            return
+        
         # 构建结果消息
         message = f"🏷️ 标签搜索结果：#{tag}\n"
-        message += f"找到 {search_result.total_results} 个结果（显示前 {len(search_result.hits)} 个）\n\n"
+        message += f"找到 {len(valid_hits)} 个结果（显示前 {len(valid_hits)} 个）\n\n"
         
-        for idx, hit in enumerate(search_result.hits, 1):
+        for idx, hit in enumerate(valid_hits, 1):
             # 生成帖子链接
             if CHANNEL_ID.startswith('@'):
                 channel_username = CHANNEL_ID.lstrip('@')
@@ -378,8 +451,8 @@ async def get_tag_cloud(update: Update, context: CallbackContext):
         async with get_db() as conn:
             cursor = await conn.cursor()
             
-            # 获取所有帖子的标签
-            await cursor.execute("SELECT tags FROM published_posts WHERE tags IS NOT NULL")
+            # 获取所有未删除帖子的标签
+            await cursor.execute("SELECT tags FROM published_posts WHERE tags IS NOT NULL AND is_deleted = 0")
             posts = await cursor.fetchall()
         
         if not posts:
@@ -485,9 +558,9 @@ async def get_my_posts(update: Update, context: CallbackContext):
         async with get_db() as conn:
             cursor = await conn.cursor()
             
-            # 获取用户的帖子
+            # 获取用户的帖子（过滤已删除的帖子）
             await cursor.execute(
-                "SELECT * FROM published_posts WHERE user_id = ? ORDER BY publish_time DESC LIMIT ?",
+                "SELECT * FROM published_posts WHERE user_id = ? AND is_deleted = 0 ORDER BY publish_time DESC LIMIT ?",
                 (user_id, limit)
             )
             user_posts = await cursor.fetchall()
@@ -609,9 +682,9 @@ async def search_by_user(update: Update, context: CallbackContext):
         async with get_db() as conn:
             cursor = await conn.cursor()
             
-            # 获取指定用户的所有帖子
+            # 获取指定用户的所有帖子（过滤已删除的帖子）
             await cursor.execute(
-                "SELECT * FROM published_posts WHERE user_id = ? ORDER BY publish_time DESC",
+                "SELECT * FROM published_posts WHERE user_id = ? AND is_deleted = 0 ORDER BY publish_time DESC",
                 (target_user_id,)
             )
             user_posts = await cursor.fetchall()
@@ -680,7 +753,7 @@ async def delete_posts_batch(update: Update, context: CallbackContext):
     
     注意：
     - 仅限 OWNER 使用
-    - 只删除数据库记录和搜索索引，不删除频道消息
+    - 会删除频道消息、数据库记录和搜索索引（双向同步删除）
     - 一次最多删除 50 个帖子
     
     Args:
@@ -713,8 +786,7 @@ async def delete_posts_batch(update: Update, context: CallbackContext):
             "• <code>/delete_posts 100-110 150 200-205</code>\n"
             "  混合使用范围和单个ID\n\n"
             "<b>⚠️ 注意：</b>\n"
-            "• 只删除数据库记录和搜索索引\n"
-            "• 不删除频道消息（需手动删除）\n"
+            "• 会删除频道消息、数据库记录和搜索索引（双向同步删除）\n"
             "• 一次最多删除 50 个帖子",
             parse_mode=ParseMode.HTML
         )
@@ -763,7 +835,12 @@ async def delete_posts_batch(update: Update, context: CallbackContext):
         success_count = 0
         failed_count = 0
         not_found_count = 0
+        already_deleted_count = 0
         deleted_from_index = 0
+        deleted_from_channel = 0
+        channel_delete_failed = 0
+        
+        from config.settings import CHANNEL_ID
         
         async with get_db() as conn:
             cursor = await conn.cursor()
@@ -772,7 +849,7 @@ async def delete_posts_batch(update: Update, context: CallbackContext):
                 try:
                     # 查询帖子是否存在
                     await cursor.execute(
-                        "SELECT rowid AS post_id, message_id, related_message_ids FROM published_posts WHERE message_id=?",
+                        "SELECT rowid AS post_id, message_id, related_message_ids, is_deleted FROM published_posts WHERE message_id=?",
                         (msg_id,)
                     )
                     post = await cursor.fetchone()
@@ -780,6 +857,50 @@ async def delete_posts_batch(update: Update, context: CallbackContext):
                     if not post:
                         not_found_count += 1
                         continue
+                    
+                    # 检查是否已经标记为删除
+                    if post.get('is_deleted', 0) == 1:
+                        already_deleted_count += 1
+                        logger.debug(f"批量删除：帖子 {msg_id} 已经被标记为删除")
+                        continue
+                    
+                    # 先尝试删除频道消息（双向同步删除）
+                    try:
+                        # 尝试删除主消息
+                        try:
+                            await context.bot.delete_message(chat_id=CHANNEL_ID, message_id=int(msg_id))
+                            deleted_from_channel += 1
+                            logger.info(f"批量删除：已从频道删除消息 {msg_id}")
+                        except Exception as e:
+                            error_msg = str(e).lower()
+                            if "message to delete not found" in error_msg or "message can't be deleted" in error_msg:
+                                # 消息已不存在或被删除，视为成功
+                                deleted_from_channel += 1
+                                logger.debug(f"批量删除：频道消息 {msg_id} 已不存在")
+                            else:
+                                channel_delete_failed += 1
+                                logger.warning(f"批量删除：删除频道消息 {msg_id} 失败: {e}")
+                        
+                        # 尝试删除关联消息
+                        if post['related_message_ids']:
+                            try:
+                                related_ids = json.loads(post['related_message_ids'])
+                                for related_id in related_ids:
+                                    try:
+                                        await context.bot.delete_message(chat_id=CHANNEL_ID, message_id=int(related_id))
+                                        deleted_from_channel += 1
+                                        logger.debug(f"批量删除：已从频道删除关联消息 {related_id}")
+                                    except Exception as e:
+                                        error_msg = str(e).lower()
+                                        if "message to delete not found" in error_msg or "message can't be deleted" in error_msg:
+                                            deleted_from_channel += 1  # 视为成功
+                                        else:
+                                            logger.debug(f"批量删除：删除关联消息 {related_id} 失败: {e}")
+                            except (json.JSONDecodeError, TypeError):
+                                pass
+                    except Exception as e:
+                        logger.warning(f"批量删除：删除频道消息时出错: {e}")
+                        channel_delete_failed += 1
                     
                     # 从搜索索引删除
                     try:
@@ -800,10 +921,10 @@ async def delete_posts_batch(update: Update, context: CallbackContext):
                     except Exception as e:
                         logger.warning(f"从索引删除消息 {msg_id} 失败: {e}")
                     
-                    # 从数据库删除
-                    await cursor.execute("DELETE FROM published_posts WHERE rowid=?", (post['post_id'],))
+                    # 标记为已删除而不是直接删除记录（保留历史数据）
+                    await cursor.execute("UPDATE published_posts SET is_deleted = 1 WHERE rowid=?", (post['post_id'],))
                     success_count += 1
-                    logger.info(f"批量删除：已删除帖子 message_id={msg_id}")
+                    logger.info(f"批量删除：已标记帖子为已删除 message_id={msg_id}")
                     
                 except Exception as e:
                     logger.error(f"删除消息 {msg_id} 时出错: {e}")
@@ -815,15 +936,18 @@ async def delete_posts_batch(update: Update, context: CallbackContext):
         result_message = "✅ <b>批量删除完成</b>\n\n"
         result_message += f"📊 <b>统计：</b>\n"
         result_message += f"• 成功删除：{success_count} 个\n"
+        if deleted_from_channel > 0:
+            result_message += f"• 从频道删除：{deleted_from_channel} 个消息\n"
         if deleted_from_index > 0:
             result_message += f"• 从索引删除：{deleted_from_index} 个\n"
+        if already_deleted_count > 0:
+            result_message += f"• 已删除：{already_deleted_count} 个（之前已标记为删除）\n"
         if not_found_count > 0:
             result_message += f"• 未找到：{not_found_count} 个\n"
         if failed_count > 0:
             result_message += f"• 失败：{failed_count} 个\n"
-        
-        result_message += f"\n⚠️ <b>注意：</b>\n"
-        result_message += "频道中的消息<b>未被删除</b>，如需删除请在频道中手动操作。"
+        if channel_delete_failed > 0:
+            result_message += f"• 频道删除失败：{channel_delete_failed} 个（可能无权限或消息已不存在）\n"
         
         await update.message.reply_text(result_message, parse_mode=ParseMode.HTML)
         

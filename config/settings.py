@@ -43,16 +43,47 @@ def get_config_bool(section, key, fallback=False):
     except (configparser.NoSectionError, configparser.NoOptionError, ValueError):
         return fallback
 
+# 辅助函数：优先从环境变量获取，如果不存在则从配置文件获取
+def get_env_or_config(env_key, section, config_key, fallback=None):
+    """
+    优先从环境变量获取配置，如果环境变量不存在则从配置文件获取
+    
+    环境变量优先级规则：
+    - 如果环境变量存在（即使值为空字符串），使用环境变量的值
+    - 如果环境变量不存在，从配置文件读取
+    - 如果配置文件也不存在，使用 fallback 默认值
+    
+    Args:
+        env_key: 环境变量名
+        section: 配置文件节名
+        config_key: 配置文件键名
+        fallback: 如果都不存在时的默认值
+    
+    Returns:
+        配置值（可能是字符串、None 或 fallback）
+    """
+    if env_key in os.environ:
+        # 环境变量存在，优先使用（即使值为空字符串，也使用环境变量的值）
+        value = os.environ[env_key]
+        logger.debug(f"使用环境变量 {env_key}={value[:20] + '...' if value and len(value) > 20 else (value if value else '(空)')}")
+        return value
+    else:
+        # 环境变量不存在，使用配置文件
+        value = get_config(section, config_key, fallback)
+        if value:
+            logger.debug(f"使用配置文件 {section}.{config_key}={value[:20] + '...' if len(value) > 20 else value}")
+        return value
+
 # 从环境变量或配置文件获取配置（环境变量优先）
-TOKEN = os.getenv('TOKEN') or get_config('BOT', 'TOKEN')
-CHANNEL_ID = os.getenv('CHANNEL_ID') or get_config('BOT', 'CHANNEL_ID')
+TOKEN = get_env_or_config('TOKEN', 'BOT', 'TOKEN')
+CHANNEL_ID = get_env_or_config('CHANNEL_ID', 'BOT', 'CHANNEL_ID')
 DB_PATH = get_config('BOT', 'DB_PATH', fallback='data/submissions.db')
-TIMEOUT = int(os.getenv('TIMEOUT', get_config_int('BOT', 'TIMEOUT', 300)))
-ALLOWED_TAGS = int(os.getenv('ALLOWED_TAGS', get_config_int('BOT', 'ALLOWED_TAGS', 30)))
+TIMEOUT = int(get_env_or_config('TIMEOUT', 'BOT', 'TIMEOUT') or get_config_int('BOT', 'TIMEOUT', 300))
+ALLOWED_TAGS = int(get_env_or_config('ALLOWED_TAGS', 'BOT', 'ALLOWED_TAGS') or get_config_int('BOT', 'ALLOWED_TAGS', 30))
 NET_TIMEOUT = 120   # 网络请求超时时间（秒）
 
 # OWNER_ID 需要转换为整数类型
-_owner_id_str = os.getenv('OWNER_ID') or get_config('BOT', 'OWNER_ID')
+_owner_id_str = get_env_or_config('OWNER_ID', 'BOT', 'OWNER_ID')
 try:
     OWNER_ID = int(_owner_id_str) if _owner_id_str else None
 except (ValueError, TypeError):
@@ -60,7 +91,7 @@ except (ValueError, TypeError):
     logger.warning(f"OWNER_ID 配置无效，无法转换为整数: {_owner_id_str}")
 
 # ADMIN_IDS 管理员ID列表（用于管理命令）
-_admin_ids_str = os.getenv('ADMIN_IDS') or get_config('BOT', 'ADMIN_IDS', fallback='')
+_admin_ids_str = get_env_or_config('ADMIN_IDS', 'BOT', 'ADMIN_IDS') or ''
 ADMIN_IDS = []
 if _admin_ids_str:
     try:
@@ -74,30 +105,52 @@ if _admin_ids_str:
 if OWNER_ID and OWNER_ID not in ADMIN_IDS:
     ADMIN_IDS.append(OWNER_ID)
 
-SHOW_SUBMITTER = os.getenv('SHOW_SUBMITTER', str(get_config_bool('BOT', 'SHOW_SUBMITTER', True))).lower() in ('true', '1', 'yes')
-NOTIFY_OWNER = os.getenv('NOTIFY_OWNER', str(get_config_bool('BOT', 'NOTIFY_OWNER', True))).lower() in ('true', '1', 'yes')
-BOT_MODE = os.getenv('BOT_MODE') or get_config('BOT', 'BOT_MODE', fallback='MIXED')
+# 布尔值配置：环境变量优先
+_show_submitter_env = os.getenv('SHOW_SUBMITTER')
+if _show_submitter_env is not None:
+    SHOW_SUBMITTER = _show_submitter_env.lower() in ('true', '1', 'yes')
+else:
+    SHOW_SUBMITTER = get_config_bool('BOT', 'SHOW_SUBMITTER', True)
+
+_notify_owner_env = os.getenv('NOTIFY_OWNER')
+if _notify_owner_env is not None:
+    NOTIFY_OWNER = _notify_owner_env.lower() in ('true', '1', 'yes')
+else:
+    NOTIFY_OWNER = get_config_bool('BOT', 'NOTIFY_OWNER', True)
+
+BOT_MODE = get_env_or_config('BOT_MODE', 'BOT', 'BOT_MODE', fallback='MIXED')
 
 # 允许的文件类型配置
-ALLOWED_FILE_TYPES = os.getenv('ALLOWED_FILE_TYPES') or get_config('BOT', 'ALLOWED_FILE_TYPES', fallback='*')
+ALLOWED_FILE_TYPES = get_env_or_config('ALLOWED_FILE_TYPES', 'BOT', 'ALLOWED_FILE_TYPES', fallback='*')
 
 # 运行模式配置
-RUN_MODE = (os.getenv('RUN_MODE') or get_config('BOT', 'RUN_MODE', fallback='POLLING')).strip().upper()
+_run_mode = get_env_or_config('RUN_MODE', 'BOT', 'RUN_MODE', fallback='POLLING')
+RUN_MODE = _run_mode.strip().upper() if _run_mode else 'POLLING'
 
 # Webhook 配置（仅当 RUN_MODE = WEBHOOK 时生效）
-WEBHOOK_URL = os.getenv('WEBHOOK_URL') or get_config('WEBHOOK', 'URL', fallback='')
-WEBHOOK_PORT = int(os.getenv('WEBHOOK_PORT', get_config_int('WEBHOOK', 'PORT', 8080)))
-WEBHOOK_PATH = os.getenv('WEBHOOK_PATH') or get_config('WEBHOOK', 'PATH', fallback='/webhook')
-WEBHOOK_SECRET_TOKEN = os.getenv('WEBHOOK_SECRET_TOKEN') or get_config('WEBHOOK', 'SECRET_TOKEN', fallback='')
+WEBHOOK_URL = get_env_or_config('WEBHOOK_URL', 'WEBHOOK', 'URL', fallback='')
+_webhook_port = get_env_or_config('WEBHOOK_PORT', 'WEBHOOK', 'PORT')
+WEBHOOK_PORT = int(_webhook_port) if _webhook_port else get_config_int('WEBHOOK', 'PORT', 8080)
+WEBHOOK_PATH = get_env_or_config('WEBHOOK_PATH', 'WEBHOOK', 'PATH', fallback='/webhook')
+WEBHOOK_SECRET_TOKEN = get_env_or_config('WEBHOOK_SECRET_TOKEN', 'WEBHOOK', 'SECRET_TOKEN', fallback='')
 
 # 搜索引擎配置
-SEARCH_INDEX_DIR = os.getenv('SEARCH_INDEX_DIR') or get_config('SEARCH', 'INDEX_DIR', fallback='data/search_index')
-SEARCH_ENABLED = os.getenv('SEARCH_ENABLED', str(get_config_bool('SEARCH', 'ENABLED', True))).lower() in ('true', '1', 'yes')
-SEARCH_ANALYZER = (os.getenv('SEARCH_ANALYZER') or get_config('SEARCH', 'ANALYZER', fallback='jieba')).strip().lower()
-SEARCH_HIGHLIGHT = os.getenv('SEARCH_HIGHLIGHT', str(get_config_bool('SEARCH', 'HIGHLIGHT', False))).lower() in ('true', '1', 'yes')
+SEARCH_INDEX_DIR = get_env_or_config('SEARCH_INDEX_DIR', 'SEARCH', 'INDEX_DIR', fallback='data/search_index')
+_search_enabled_env = os.getenv('SEARCH_ENABLED')
+if _search_enabled_env is not None:
+    SEARCH_ENABLED = _search_enabled_env.lower() in ('true', '1', 'yes')
+else:
+    SEARCH_ENABLED = get_config_bool('SEARCH', 'ENABLED', True)
+SEARCH_ANALYZER = (get_env_or_config('SEARCH_ANALYZER', 'SEARCH', 'ANALYZER', fallback='jieba') or 'jieba').strip().lower()
+_search_highlight_env = os.getenv('SEARCH_HIGHLIGHT')
+if _search_highlight_env is not None:
+    SEARCH_HIGHLIGHT = _search_highlight_env.lower() in ('true', '1', 'yes')
+else:
+    SEARCH_HIGHLIGHT = get_config_bool('SEARCH', 'HIGHLIGHT', False)
 
 # 数据库配置
-DB_CACHE_KB = int(os.getenv('DB_CACHE_KB', get_config_int('DB', 'CACHE_SIZE_KB', 4096)))  # SQLite page cache，单位KB
+_db_cache_kb = get_env_or_config('DB_CACHE_KB', 'DB', 'CACHE_SIZE_KB')
+DB_CACHE_KB = int(_db_cache_kb) if _db_cache_kb else get_config_int('DB', 'CACHE_SIZE_KB', 4096)  # SQLite page cache，单位KB
 
 # 验证必要配置
 if not TOKEN:
