@@ -1,0 +1,643 @@
+"""
+频道消息监听器模块
+监听频道新消息，自动记录到数据库
+支持处理非本项目bot发布的不规范帖子
+"""
+import json
+import re
+import logging
+from datetime import datetime
+from typing import Optional
+from telegram import Update
+from telegram.ext import CallbackContext
+
+from config.settings import CHANNEL_ID
+from database.db_manager import get_db
+from utils.search_engine import get_search_engine, PostDocument
+
+logger = logging.getLogger(__name__)
+
+# 字段长度限制（防止数据库溢出）
+MAX_TITLE_LENGTH = 200
+MAX_NOTE_LENGTH = 2000
+MAX_CAPTION_LENGTH = 4000
+MAX_FILENAME_LENGTH = 500
+MAX_TAGS_LENGTH = 500
+
+
+def clean_text(text: str, max_length: Optional[int] = None) -> str:
+    """
+    清理文本：移除多余空格、换行，处理特殊字符
+    
+    Args:
+        text: 原始文本
+        max_length: 最大长度限制
+        
+    Returns:
+        str: 清理后的文本
+    """
+    if not text:
+        return ''
+    
+    # 移除控制字符（保留换行符）
+    text = re.sub(r'[\x00-\x08\x0b-\x0c\x0e-\x1f\x7f-\x9f]', '', text)
+    
+    # 规范化换行符
+    text = text.replace('\r\n', '\n').replace('\r', '\n')
+    
+    # 移除多余的空格和换行
+    text = re.sub(r'[ \t]+', ' ', text)  # 多个空格合并为一个
+    text = re.sub(r'\n{3,}', '\n\n', text)  # 多个换行合并为两个
+    
+    # 去除首尾空白
+    text = text.strip()
+    
+    # 限制长度
+    if max_length and len(text) > max_length:
+        text = text[:max_length].rstrip()
+        logger.debug(f"文本被截断到 {max_length} 字符")
+    
+    return text
+
+
+def extract_tags_from_text(text: str) -> str:
+    """
+    从文本中提取标签（支持多种格式）
+    
+    Args:
+        text: 文本内容
+        
+    Returns:
+        str: 提取的标签（空格分隔）
+    """
+    if not text:
+        return ''
+    
+    tags = []
+    
+    # 方法1: 查找 #标签
+    hashtag_tags = re.findall(r'#(\w+)', text)
+    tags.extend(hashtag_tags)
+    
+    # 方法2: 查找 [标签] 格式
+    bracket_tags = re.findall(r'\[([^\]]+)\]', text)
+    # 只保留看起来像标签的（短文本，不含空格）
+    bracket_tags = [tag.strip() for tag in bracket_tags if len(tag.strip()) < 30 and ' ' not in tag.strip()]
+    tags.extend(bracket_tags)
+    
+    # 去重并转换为 #标签 格式
+    unique_tags = list(dict.fromkeys([tag.lower() for tag in tags]))  # 保持顺序的去重，转为小写
+    result = ' '.join([f"#{tag}" for tag in unique_tags])
+    
+    # 限制长度
+    if len(result) > MAX_TAGS_LENGTH:
+        result = result[:MAX_TAGS_LENGTH].rstrip()
+        logger.debug(f"标签被截断到 {MAX_TAGS_LENGTH} 字符")
+    
+    return result
+
+
+def extract_title_from_text(text: str, filename: str = '') -> str:
+    """
+    从文本中智能提取标题（支持多种格式）
+    
+    Args:
+        text: 文本内容
+        filename: 文件名（可选，用于推断标题）
+        
+    Returns:
+        str: 提取的标题
+    """
+    if not text and not filename:
+        return ''
+    
+    # 方法1: 查找明确的标题标记（如 "标题:"、"Title:" 等）
+    title_patterns = [
+        r'(?:标题|标题：|Title|title)[:：]\s*(.+?)(?:\n|$)',
+        r'^【(.+?)】',  # 【标题】格式
+        r'^\[(.+?)\]',  # [标题] 格式
+        r'^(.+?)[:：]\s*\n',  # 第一行以冒号结尾
+    ]
+    
+    for pattern in title_patterns:
+        match = re.search(pattern, text, re.IGNORECASE | re.MULTILINE)
+        if match:
+            title = match.group(1).strip()
+            if title and len(title) > 3:  # 至少3个字符
+                return clean_text(title, MAX_TITLE_LENGTH)
+    
+    # 方法2: 从文件名推断（如果没有文本）
+    if not text and filename:
+        # 移除扩展名
+        name_without_ext = re.sub(r'\.[^.]+$', '', filename)
+        if name_without_ext and len(name_without_ext) > 3:
+            return clean_text(name_without_ext, MAX_TITLE_LENGTH)
+    
+    # 方法3: 取第一行（移除标签和链接后）
+    if text:
+        # 移除标签和链接
+        text_clean = re.sub(r'#\w+', '', text)
+        text_clean = re.sub(r'https?://[^\s]+', '', text_clean)
+        text_clean = text_clean.strip()
+        
+        if text_clean:
+            # 取第一行
+            first_line = text_clean.split('\n')[0].strip()
+            if first_line:
+                # 如果第一行太长，取前部分
+                if len(first_line) > MAX_TITLE_LENGTH:
+                    # 尝试在句号、问号、感叹号处截断
+                    sentence_end = re.search(r'[。！？.!?]', first_line[:MAX_TITLE_LENGTH])
+                    if sentence_end:
+                        first_line = first_line[:sentence_end.end()].strip()
+                    else:
+                        first_line = first_line[:MAX_TITLE_LENGTH].rstrip()
+                
+                return clean_text(first_line, MAX_TITLE_LENGTH)
+    
+    # 方法4: 使用文件名作为后备
+    if filename:
+        name_without_ext = re.sub(r'\.[^.]+$', '', filename)
+        if name_without_ext:
+            return clean_text(name_without_ext, MAX_TITLE_LENGTH)
+    
+    return ''
+
+
+def extract_link_from_text(text: str) -> str:
+    """
+    从文本中提取链接（支持多种格式）
+    
+    Args:
+        text: 文本内容
+        
+    Returns:
+        str: 提取的链接（第一个有效链接）
+    """
+    if not text:
+        return ''
+    
+    # 查找URL（支持 http:// 和 https://）
+    url_pattern = r'https?://[^\s\)]+'
+    urls = re.findall(url_pattern, text)
+    
+    if urls:
+        # 返回第一个有效链接（移除可能的尾随标点）
+        link = urls[0].rstrip('.,;!?)')
+        # 验证链接格式
+        if re.match(r'https?://.+', link):
+            return link
+    
+    return ''
+
+
+def validate_and_normalize_message_info(message_info: dict) -> dict:
+    """
+    验证和规范化消息信息（处理不规范数据）
+    
+    Args:
+        message_info: 原始消息信息字典
+        
+    Returns:
+        dict: 规范化后的消息信息字典
+    """
+    normalized = message_info.copy()
+    warnings = []
+    
+    # 验证和清理 message_id
+    if not normalized.get('message_id'):
+        raise ValueError("消息ID缺失")
+    
+    # 验证和清理标题
+    title = normalized.get('title', '')
+    if not title or len(title.strip()) < 2:
+        # 如果没有标题，尝试从其他字段生成
+        caption = normalized.get('caption', '')
+        filename = normalized.get('filename', '')
+        title = extract_title_from_text(caption, filename)
+        if not title:
+            # 最后的默认值
+            if filename:
+                title = filename
+            elif caption:
+                title = caption[:30] + '...' if len(caption) > 30 else caption
+            else:
+                title = f"消息 {normalized['message_id']}"
+            warnings.append(f"标题缺失，已自动生成: {title[:50]}")
+    
+    normalized['title'] = clean_text(title, MAX_TITLE_LENGTH)
+    
+    # 验证和清理标签
+    tags = normalized.get('tags', '')
+    normalized['tags'] = clean_text(tags, MAX_TAGS_LENGTH)
+    
+    # 验证和清理链接
+    link = normalized.get('link', '')
+    if link:
+        # 验证链接格式
+        if not re.match(r'https?://.+', link):
+            warnings.append(f"链接格式无效，已清除: {link[:50]}")
+            normalized['link'] = ''
+        else:
+            normalized['link'] = link[:500]  # 限制链接长度
+    
+    # 验证和清理说明
+    note = normalized.get('note', '')
+    normalized['note'] = clean_text(note, MAX_NOTE_LENGTH)
+    
+    # 验证和清理 caption
+    caption = normalized.get('caption', '')
+    normalized['caption'] = clean_text(caption, MAX_CAPTION_LENGTH)
+    
+    # 验证和清理文件名
+    filename = normalized.get('filename', '')
+    if filename:
+        # 移除路径分隔符（防止路径注入）
+        filename = filename.replace('/', '_').replace('\\', '_')
+        # 移除控制字符
+        filename = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', filename)
+        normalized['filename'] = clean_text(filename, MAX_FILENAME_LENGTH)
+    
+    # 验证内容类型
+    content_type = normalized.get('content_type', 'text')
+    valid_types = ['text', 'media', 'document', 'mixed']
+    if content_type not in valid_types:
+        warnings.append(f"无效的内容类型: {content_type}，已设置为 'text'")
+        normalized['content_type'] = 'text'
+    
+    # 验证发布时间
+    publish_time = normalized.get('publish_time')
+    if not publish_time:
+        normalized['publish_time'] = datetime.now()
+        warnings.append("发布时间缺失，已设置为当前时间")
+    elif not isinstance(publish_time, datetime):
+        try:
+            if isinstance(publish_time, (int, float)):
+                normalized['publish_time'] = datetime.fromtimestamp(publish_time)
+            else:
+                normalized['publish_time'] = datetime.now()
+                warnings.append("发布时间格式无效，已设置为当前时间")
+        except (ValueError, OSError):
+            normalized['publish_time'] = datetime.now()
+            warnings.append("发布时间解析失败，已设置为当前时间")
+    
+    # 验证用户信息
+    if not normalized.get('user_id'):
+        normalized['user_id'] = 0
+    if not normalized.get('username'):
+        normalized['username'] = 'channel'
+    
+    # 记录警告
+    if warnings:
+        logger.warning(f"消息 {normalized['message_id']} 数据不规范: {'; '.join(warnings)}")
+    
+    return normalized
+
+
+async def extract_message_info(message):
+    """
+    从消息对象中提取信息（容错处理，支持不规范消息）
+    
+    Args:
+        message: Telegram 消息对象
+        
+    Returns:
+        dict: 包含提取信息的字典
+    """
+    try:
+        # 安全获取消息ID
+        message_id = getattr(message, 'message_id', None)
+        if not message_id:
+            raise ValueError("消息ID缺失")
+        
+        # 安全获取文本内容
+        caption = getattr(message, 'caption', None) or ''
+        text = getattr(message, 'text', None) or ''
+        full_text = caption or text or ''
+        
+        # 安全获取日期
+        date = getattr(message, 'date', None)
+        publish_time = date if date else datetime.now()
+        
+        info = {
+            'message_id': message_id,
+            'media_list': [],
+            'doc_list': [],
+            'content_type': 'text',
+            'caption': full_text,
+            'tags': '',
+            'title': '',
+            'link': '',
+            'note': '',
+            'filename': '',
+            'publish_time': publish_time,
+            'user_id': 0,  # 频道消息没有用户ID
+            'username': 'channel',  # 频道消息默认用户名
+            'related_message_ids': []  # 用于媒体组
+        }
+        
+        # 提取文本信息
+        if full_text:
+            info['tags'] = extract_tags_from_text(full_text)
+            info['link'] = extract_link_from_text(full_text)
+            # note 就是完整的 caption（去掉标签和链接后）
+            note_text = re.sub(r'#\w+', '', full_text)
+            note_text = re.sub(r'https?://[^\s]+', '', note_text)
+            note_text = note_text.strip()
+            info['note'] = note_text if note_text else ''
+        
+        # 提取媒体信息（容错处理）
+        filename_candidates = []
+        
+        try:
+            if hasattr(message, 'photo') and message.photo:
+                # 获取最大尺寸的照片
+                photo = message.photo[-1]
+                file_id = getattr(photo, 'file_id', None)
+                if file_id:
+                    info['media_list'].append(f"photo:{file_id}")
+                    info['content_type'] = 'media'
+        except Exception as e:
+            logger.warning(f"提取照片信息失败: {e}")
+        
+        try:
+            if hasattr(message, 'video') and message.video:
+                file_id = getattr(message.video, 'file_id', None)
+                if file_id:
+                    info['media_list'].append(f"video:{file_id}")
+                    info['content_type'] = 'media'
+                file_name = getattr(message.video, 'file_name', None)
+                if file_name:
+                    filename_candidates.append(file_name)
+        except Exception as e:
+            logger.warning(f"提取视频信息失败: {e}")
+        
+        try:
+            if hasattr(message, 'animation') and message.animation:
+                file_id = getattr(message.animation, 'file_id', None)
+                if file_id:
+                    info['media_list'].append(f"animation:{file_id}")
+                    info['content_type'] = 'media'
+        except Exception as e:
+            logger.warning(f"提取动画信息失败: {e}")
+        
+        try:
+            if hasattr(message, 'audio') and message.audio:
+                file_id = getattr(message.audio, 'file_id', None)
+                if file_id:
+                    info['media_list'].append(f"audio:{file_id}")
+                    info['content_type'] = 'media'
+                file_name = getattr(message.audio, 'file_name', None)
+                if file_name:
+                    filename_candidates.append(file_name)
+                # 音频可能还有标题和表演者
+                title = getattr(message.audio, 'title', None)
+                performer = getattr(message.audio, 'performer', None)
+                if title and not info['title']:
+                    info['title'] = title
+                    if performer:
+                        info['title'] = f"{performer} - {title}"
+        except Exception as e:
+            logger.warning(f"提取音频信息失败: {e}")
+        
+        try:
+            if hasattr(message, 'document') and message.document:
+                file_id = getattr(message.document, 'file_id', None)
+                file_name = getattr(message.document, 'file_name', None) or '未知文件'
+                if file_id:
+                    info['doc_list'].append(f"document:{file_id}:{file_name}")
+                    info['content_type'] = 'document'
+                    filename_candidates.append(file_name)
+        except Exception as e:
+            logger.warning(f"提取文档信息失败: {e}")
+        
+        # 处理文件名（优先使用第一个找到的）
+        if filename_candidates and not info['filename']:
+            info['filename'] = filename_candidates[0]
+        
+        # 如果没有文本但有媒体，尝试从文件名提取标题
+        if not info['title'] and info['filename']:
+            info['title'] = extract_title_from_text('', info['filename'])
+        
+        # 如果还是没有标题，使用默认值（稍后在验证时处理）
+        if not info['title'] and full_text:
+            info['title'] = extract_title_from_text(full_text, info['filename'])
+        
+        # 处理混合类型
+        if info['media_list'] and info['doc_list']:
+            info['content_type'] = 'mixed'
+        elif not info['media_list'] and not info['doc_list'] and full_text:
+            info['content_type'] = 'text'
+        
+        # 处理媒体组（media_group_id）
+        try:
+            if hasattr(message, 'media_group_id') and message.media_group_id:
+                info['related_message_ids'] = [message_id]
+        except Exception as e:
+            logger.warning(f"提取媒体组信息失败: {e}")
+        
+        # 处理转发消息
+        try:
+            if hasattr(message, 'forward_from_chat') and message.forward_from_chat:
+                # 转发自其他频道/群组
+                chat_title = getattr(message.forward_from_chat, 'title', None) or ''
+                if chat_title:
+                    info['note'] = f"转发自: {chat_title}\n{info['note']}"
+            elif hasattr(message, 'forward_from') and message.forward_from:
+                # 转发自用户
+                username = getattr(message.forward_from, 'username', None)
+                user_id = getattr(message.forward_from, 'id', None)
+                if username:
+                    info['note'] = f"转发自: @{username}\n{info['note']}"
+                elif user_id:
+                    info['note'] = f"转发自: user{user_id}\n{info['note']}"
+        except Exception as e:
+            logger.warning(f"提取转发信息失败: {e}")
+        
+        return info
+        
+    except Exception as e:
+        logger.error(f"提取消息信息时发生错误: {e}", exc_info=True)
+        # 返回最小可用信息
+        return {
+            'message_id': getattr(message, 'message_id', 0),
+            'media_list': [],
+            'doc_list': [],
+            'content_type': 'text',
+            'caption': '',
+            'tags': '',
+            'title': f"消息 {getattr(message, 'message_id', 'unknown')}",
+            'link': '',
+            'note': '',
+            'filename': '',
+            'publish_time': datetime.now(),
+            'user_id': 0,
+            'username': 'channel',
+            'related_message_ids': []
+        }
+
+
+async def save_channel_message(message_info: dict):
+    """
+    保存频道消息到数据库和搜索索引
+    
+    Args:
+        message_info: 消息信息字典
+    """
+    try:
+        message_id = message_info['message_id']
+        
+        # 检查是否已存在
+        async with get_db() as conn:
+            cursor = await conn.cursor()
+            await cursor.execute(
+                "SELECT message_id FROM published_posts WHERE message_id = ?",
+                (message_id,)
+            )
+            if await cursor.fetchone():
+                logger.debug(f"消息 {message_id} 已存在，跳过")
+                return
+        
+        # 准备数据
+        media_list = message_info['media_list']
+        doc_list = message_info['doc_list']
+        content_type = message_info['content_type']
+        file_ids = json.dumps(media_list if media_list else doc_list)
+        tags = message_info['tags']
+        title = message_info['title']
+        link = message_info['link']
+        note = message_info['note']
+        caption = message_info['caption']
+        filename = message_info['filename']
+        publish_time = message_info['publish_time']
+        user_id = message_info['user_id']
+        username = message_info['username'] or 'channel'
+        related_ids_json = None
+        
+        # 处理相关消息ID
+        if message_info['related_message_ids']:
+            related_ids_json = json.dumps(message_info['related_message_ids'])
+        
+        # 保存到数据库
+        post_id = None
+        async with get_db() as conn:
+            cursor = await conn.cursor()
+            await cursor.execute("""
+                INSERT INTO published_posts 
+                (message_id, user_id, username, title, tags, link, note,
+                 content_type, file_ids, caption, filename, publish_time, last_update, related_message_ids)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                message_id,
+                user_id,
+                username,
+                title,
+                tags,
+                link,
+                note,
+                content_type,
+                file_ids,
+                caption,
+                filename,
+                publish_time.timestamp() if isinstance(publish_time, datetime) else publish_time,
+                datetime.now().timestamp(),
+                related_ids_json
+            ))
+            post_id = cursor.lastrowid
+            await conn.commit()
+            logger.info(f"已保存频道消息 {message_id} (post_id: {post_id}) 到数据库")
+        
+        # 添加到搜索索引
+        try:
+            search_engine = get_search_engine()
+            
+            post_doc = PostDocument(
+                message_id=message_id,
+                post_id=post_id,
+                title=title,
+                description=note,
+                tags=tags,
+                filename=filename,
+                link=link,
+                user_id=user_id,
+                username=username,
+                publish_time=publish_time if isinstance(publish_time, datetime) else datetime.fromtimestamp(publish_time),
+                views=0,
+                heat_score=0
+            )
+            
+            search_engine.add_post(post_doc)
+            logger.info(f"已添加频道消息 {message_id} (post_id: {post_id}) 到搜索索引")
+            
+        except Exception as e:
+            logger.error(f"添加到搜索索引失败: {e}", exc_info=True)
+            
+    except Exception as e:
+        logger.error(f"保存频道消息失败: {e}", exc_info=True)
+
+
+async def handle_channel_message(update: Update, context: CallbackContext):
+    """
+    处理频道消息
+    
+    Args:
+        update: Telegram 更新对象
+        context: 回调上下文
+    """
+    try:
+        # 只处理频道消息
+        if not update.channel_post and not update.edited_channel_post:
+            return
+        
+        message = update.channel_post or update.edited_channel_post
+        
+        # 验证消息来源（通过 chat_id 或 username）
+        is_valid = False
+        if CHANNEL_ID.startswith('@'):
+            # 对于 @username 格式，通过 chat.username 验证
+            if message.chat.username:
+                is_valid = message.chat.username.lower() == CHANNEL_ID.lstrip('@').lower()
+            else:
+                # 如果没有 username，尝试通过 chat.id 验证（需要先获取频道信息）
+                try:
+                    chat = await context.bot.get_chat(CHANNEL_ID)
+                    is_valid = message.chat.id == chat.id
+                except Exception as e:
+                    logger.warning(f"无法验证频道ID: {e}")
+                    # 如果无法验证，默认接受（由 filters.Chat 过滤）
+                    is_valid = True
+        else:
+            # 对于数字ID格式，直接比较
+            try:
+                channel_id_int = int(CHANNEL_ID)
+                is_valid = message.chat.id == channel_id_int
+            except ValueError:
+                logger.warning(f"无法解析 CHANNEL_ID: {CHANNEL_ID}")
+                # 如果无法解析，默认接受（由 filters.Chat 过滤）
+                is_valid = True
+        
+        if not is_valid:
+            logger.debug(f"消息来自其他频道，跳过: {message.chat.id}")
+            return
+        
+        logger.info(f"收到频道消息: {message.message_id}")
+        
+        # 提取消息信息
+        message_info = await extract_message_info(message)
+        
+        # 验证和规范化消息信息（处理不规范数据）
+        try:
+            message_info = validate_and_normalize_message_info(message_info)
+        except Exception as e:
+            logger.error(f"验证消息信息失败: {e}", exc_info=True)
+            # 即使验证失败，也尝试保存（使用默认值）
+            logger.warning(f"使用默认值保存消息 {message_info.get('message_id', 'unknown')}")
+        
+        # 保存到数据库
+        await save_channel_message(message_info)
+        
+        logger.info(f"频道消息 {message.message_id} 处理完成")
+        
+    except Exception as e:
+        logger.error(f"处理频道消息失败: {e}", exc_info=True)
+

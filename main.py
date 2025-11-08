@@ -15,6 +15,7 @@ from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
+    BaseHandler,
     filters,
     ConversationHandler,
     CallbackContext,
@@ -26,7 +27,8 @@ from dotenv import load_dotenv
 # 配置相关导入
 from config.settings import (
     TOKEN, TIMEOUT, BOT_MODE, MODE_MEDIA, MODE_DOCUMENT, MODE_MIXED,
-    RUN_MODE, WEBHOOK_URL, WEBHOOK_PORT, WEBHOOK_PATH, WEBHOOK_SECRET_TOKEN
+    RUN_MODE, WEBHOOK_URL, WEBHOOK_PORT, WEBHOOK_PATH, WEBHOOK_SECRET_TOKEN,
+    CHANNEL_ID
 )
 from models.state import STATE
 
@@ -86,6 +88,8 @@ from handlers.search_handlers import (
     delete_posts_batch,
     handle_search_input
 )
+# 频道消息监听器
+from handlers.channel_listener import handle_channel_message
 from handlers.index_handlers import (
     rebuild_index_command,
     sync_index_command,
@@ -475,6 +479,26 @@ def setup_application(application):
     
     # 注册会话超时检查处理器
     application.add_handler(MessageHandler(filters.ALL, check_conversation_timeout), group=0)
+    
+    # 注册频道消息监听器（监听频道新消息，自动记录到数据库）
+    try:
+        logger.info("注册频道消息监听器...")
+        # 频道消息不会触发普通的 MessageHandler，需要使用 BaseHandler 捕获所有更新
+        # 然后在处理器内部检查 update.channel_post 或 update.edited_channel_post
+        # 创建一个自定义的 BaseHandler 来捕获所有更新
+        class ChannelPostHandler(BaseHandler):
+            """自定义处理器，用于捕获频道消息"""
+            def __init__(self, callback):
+                super().__init__(callback)
+            
+            def check_update(self, update):
+                """检查更新是否包含频道消息"""
+                return update.channel_post is not None or update.edited_channel_post is not None
+        
+        application.add_handler(ChannelPostHandler(handle_channel_message), group=2)
+        logger.info("频道消息监听器注册完成")
+    except Exception as e:
+        logger.error(f"注册频道消息监听器失败: {e}", exc_info=True)
     
     try:
         # 添加独立的 /start 命令处理器（只显示欢迎信息）

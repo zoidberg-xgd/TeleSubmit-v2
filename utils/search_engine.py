@@ -12,9 +12,10 @@ from whoosh import index
 from whoosh.fields import Schema, TEXT, ID, DATETIME, NUMERIC
 from whoosh.qparser import QueryParser, MultifieldParser
 from whoosh.writing import IndexWriter
-from whoosh.query import Term, Or, DateRange, NumericRange, And
+from whoosh.query import Term, Or, DateRange, NumericRange, And, Wildcard, FuzzyTerm
 import whoosh.highlight as highlight
 from config.settings import SEARCH_ANALYZER, SEARCH_HIGHLIGHT
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -333,7 +334,23 @@ class PostSearchEngine:
         try:
             # 解析查询
             if query_str.strip():
-                q = self.query_parser.parse(query_str)
+                # 检测是否包含中文字符，且使用 SimpleAnalyzer
+                # SimpleAnalyzer 将中文作为整体索引，需要特殊处理以支持部分匹配
+                has_chinese = bool(re.search(r'[\u4e00-\u9fff]', query_str))
+                use_simple_analyzer = SEARCH_ANALYZER == 'simple'
+                
+                if has_chinese and use_simple_analyzer:
+                    # 对于中文查询，使用通配符查询以支持部分匹配
+                    # 在多个字段中搜索包含查询字符串的内容
+                    query_terms = []
+                    search_fields = ['title', 'description', 'tags', 'filename']
+                    for field in search_fields:
+                        # 使用通配符匹配，支持部分匹配
+                        query_terms.append(Wildcard(field, f'*{query_str}*'))
+                    q = Or(query_terms) if query_terms else self.query_parser.parse(query_str)
+                else:
+                    # 使用标准查询解析器
+                    q = self.query_parser.parse(query_str)
             else:
                 # 空查询时返回所有结果
                 from whoosh.query import Every
