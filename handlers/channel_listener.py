@@ -6,8 +6,9 @@
 import json
 import re
 import logging
+import asyncio
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Set
 from telegram import Update
 from telegram.ext import CallbackContext
 
@@ -16,6 +17,10 @@ from database.db_manager import get_db
 from utils.search_engine import get_search_engine, PostDocument
 
 logger = logging.getLogger(__name__)
+
+# 并发控制：正在处理的消息ID集合（防止重复处理）
+_processing_messages: Set[int] = set()
+_processing_lock = asyncio.Lock()
 
 # 字段长度限制（防止数据库溢出）
 MAX_TITLE_LENGTH = 200
@@ -200,20 +205,38 @@ def validate_and_normalize_message_info(message_info: dict) -> dict:
         
     Returns:
         dict: 规范化后的消息信息字典
+        
+    Raises:
+        ValueError: 如果消息ID缺失或数据格式严重错误
     """
+    if not message_info or not isinstance(message_info, dict):
+        raise ValueError("消息信息必须是字典类型")
+    
     normalized = message_info.copy()
     warnings = []
     
     # 验证和清理 message_id
-    if not normalized.get('message_id'):
+    message_id = normalized.get('message_id')
+    if not message_id:
         raise ValueError("消息ID缺失")
     
+    # 确保 message_id 是整数
+    try:
+        normalized['message_id'] = int(message_id)
+    except (ValueError, TypeError):
+        raise ValueError(f"消息ID格式无效: {message_id}")
+    
     # 验证和清理标题
-    title = normalized.get('title', '')
-    if not title or len(title.strip()) < 2:
+    title = normalized.get('title')
+    if not title or not isinstance(title, str) or len(title.strip()) < 2:
         # 如果没有标题，尝试从其他字段生成
-        caption = normalized.get('caption', '')
-        filename = normalized.get('filename', '')
+        caption = normalized.get('caption') or ''
+        filename = normalized.get('filename') or ''
+        if not isinstance(caption, str):
+            caption = str(caption) if caption else ''
+        if not isinstance(filename, str):
+            filename = str(filename) if filename else ''
+        
         title = extract_title_from_text(caption, filename)
         if not title:
             # 最后的默认值
@@ -225,67 +248,106 @@ def validate_and_normalize_message_info(message_info: dict) -> dict:
                 title = f"消息 {normalized['message_id']}"
             warnings.append(f"标题缺失，已自动生成: {title[:50]}")
     
-    normalized['title'] = clean_text(title, MAX_TITLE_LENGTH)
+    normalized['title'] = clean_text(str(title) if title else '', MAX_TITLE_LENGTH)
     
     # 验证和清理标签
-    tags = normalized.get('tags', '')
+    tags = normalized.get('tags') or ''
+    if not isinstance(tags, str):
+        tags = str(tags) if tags else ''
     normalized['tags'] = clean_text(tags, MAX_TAGS_LENGTH)
     
     # 验证和清理链接
-    link = normalized.get('link', '')
+    link = normalized.get('link') or ''
     if link:
+        if not isinstance(link, str):
+            link = str(link)
         # 验证链接格式
         if not re.match(r'https?://.+', link):
             warnings.append(f"链接格式无效，已清除: {link[:50]}")
             normalized['link'] = ''
         else:
             normalized['link'] = link[:500]  # 限制链接长度
+    else:
+        normalized['link'] = ''
     
     # 验证和清理说明
-    note = normalized.get('note', '')
+    note = normalized.get('note') or ''
+    if not isinstance(note, str):
+        note = str(note) if note else ''
     normalized['note'] = clean_text(note, MAX_NOTE_LENGTH)
     
     # 验证和清理 caption
-    caption = normalized.get('caption', '')
+    caption = normalized.get('caption') or ''
+    if not isinstance(caption, str):
+        caption = str(caption) if caption else ''
     normalized['caption'] = clean_text(caption, MAX_CAPTION_LENGTH)
     
     # 验证和清理文件名
-    filename = normalized.get('filename', '')
+    filename = normalized.get('filename') or ''
     if filename:
+        if not isinstance(filename, str):
+            filename = str(filename)
         # 移除路径分隔符（防止路径注入）
         filename = filename.replace('/', '_').replace('\\', '_')
         # 移除控制字符
         filename = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', filename)
         normalized['filename'] = clean_text(filename, MAX_FILENAME_LENGTH)
+    else:
+        normalized['filename'] = ''
     
     # 验证内容类型
     content_type = normalized.get('content_type', 'text')
+    if not isinstance(content_type, str):
+        content_type = str(content_type) if content_type else 'text'
     valid_types = ['text', 'media', 'document', 'mixed']
     if content_type not in valid_types:
         warnings.append(f"无效的内容类型: {content_type}，已设置为 'text'")
         normalized['content_type'] = 'text'
+    else:
+        normalized['content_type'] = content_type
     
     # 验证发布时间
     publish_time = normalized.get('publish_time')
     if not publish_time:
         normalized['publish_time'] = datetime.now()
         warnings.append("发布时间缺失，已设置为当前时间")
-    elif not isinstance(publish_time, datetime):
+    elif isinstance(publish_time, datetime):
+        # 已经是 datetime 对象，直接使用
+        normalized['publish_time'] = publish_time
+    else:
         try:
             if isinstance(publish_time, (int, float)):
-                normalized['publish_time'] = datetime.fromtimestamp(publish_time)
+                normalized['publish_time'] = datetime.fromtimestamp(float(publish_time))
+            elif isinstance(publish_time, str):
+                # 尝试解析字符串格式的时间
+                try:
+                    normalized['publish_time'] = datetime.fromisoformat(publish_time.replace('Z', '+00:00'))
+                except (ValueError, AttributeError):
+                    normalized['publish_time'] = datetime.now()
+                    warnings.append("发布时间字符串格式无效，已设置为当前时间")
             else:
                 normalized['publish_time'] = datetime.now()
                 warnings.append("发布时间格式无效，已设置为当前时间")
-        except (ValueError, OSError):
+        except (ValueError, OSError, OverflowError) as e:
             normalized['publish_time'] = datetime.now()
-            warnings.append("发布时间解析失败，已设置为当前时间")
+            warnings.append(f"发布时间解析失败: {e}，已设置为当前时间")
     
     # 验证用户信息
-    if not normalized.get('user_id'):
+    user_id = normalized.get('user_id')
+    if not user_id:
         normalized['user_id'] = 0
-    if not normalized.get('username'):
+    else:
+        try:
+            normalized['user_id'] = int(user_id)
+        except (ValueError, TypeError):
+            warnings.append(f"用户ID格式无效: {user_id}，已设置为 0")
+            normalized['user_id'] = 0
+    
+    username = normalized.get('username')
+    if not username or not isinstance(username, str):
         normalized['username'] = 'channel'
+    else:
+        normalized['username'] = str(username).strip() or 'channel'
     
     # 记录警告
     if warnings:
@@ -337,7 +399,7 @@ async def extract_message_info(message):
         }
         
         # 提取文本信息
-        if full_text:
+        if full_text and isinstance(full_text, str):
             info['tags'] = extract_tags_from_text(full_text)
             info['link'] = extract_link_from_text(full_text)
             # note 就是完整的 caption（去掉标签和链接后）
@@ -345,6 +407,10 @@ async def extract_message_info(message):
             note_text = re.sub(r'https?://[^\s]+', '', note_text)
             note_text = note_text.strip()
             info['note'] = note_text if note_text else ''
+        else:
+            info['tags'] = ''
+            info['link'] = ''
+            info['note'] = ''
         
         # 提取媒体信息（容错处理）
         filename_candidates = []
@@ -483,73 +549,149 @@ async def save_channel_message(message_info: dict):
     
     Args:
         message_info: 消息信息字典
+        
+    Returns:
+        bool: 是否成功保存
     """
+    message_id = None
+    post_id = None
+    
     try:
-        message_id = message_info['message_id']
+        # 验证必要字段
+        message_id = message_info.get('message_id')
+        if not message_id:
+            logger.error("消息ID缺失，无法保存")
+            return False
         
-        # 检查是否已存在
-        async with get_db() as conn:
-            cursor = await conn.cursor()
-            await cursor.execute(
-                "SELECT message_id FROM published_posts WHERE message_id = ?",
-                (message_id,)
-            )
-            if await cursor.fetchone():
-                logger.debug(f"消息 {message_id} 已存在，跳过")
-                return
+        # 准备数据（使用安全的默认值）
+        media_list = message_info.get('media_list', [])
+        doc_list = message_info.get('doc_list', [])
+        content_type = message_info.get('content_type', 'text')
         
-        # 准备数据
-        media_list = message_info['media_list']
-        doc_list = message_info['doc_list']
-        content_type = message_info['content_type']
-        file_ids = json.dumps(media_list if media_list else doc_list)
-        tags = message_info['tags']
-        title = message_info['title']
-        link = message_info['link']
-        note = message_info['note']
-        caption = message_info['caption']
-        filename = message_info['filename']
-        publish_time = message_info['publish_time']
-        user_id = message_info['user_id']
-        username = message_info['username'] or 'channel'
+        # 验证列表类型
+        if not isinstance(media_list, list):
+            logger.warning(f"media_list 不是列表类型: {type(media_list)}，使用空列表")
+            media_list = []
+        if not isinstance(doc_list, list):
+            logger.warning(f"doc_list 不是列表类型: {type(doc_list)}，使用空列表")
+            doc_list = []
+        
+        # 安全地序列化 JSON
+        try:
+            file_ids_data = media_list if media_list else doc_list
+            file_ids = json.dumps(file_ids_data, ensure_ascii=False)
+        except (TypeError, ValueError) as e:
+            logger.warning(f"序列化 file_ids 失败: {e}，使用空列表")
+            file_ids = '[]'
+        except Exception as e:
+            logger.error(f"序列化 file_ids 时发生意外错误: {e}，使用空列表")
+            file_ids = '[]'
+        
+        tags = message_info.get('tags', '')
+        title = message_info.get('title', '')
+        link = message_info.get('link', '')
+        note = message_info.get('note', '')
+        caption = message_info.get('caption', '')
+        filename = message_info.get('filename', '')
+        publish_time = message_info.get('publish_time', datetime.now())
+        user_id = message_info.get('user_id', 0)
+        username = message_info.get('username', 'channel') or 'channel'
         related_ids_json = None
         
         # 处理相关消息ID
-        if message_info['related_message_ids']:
-            related_ids_json = json.dumps(message_info['related_message_ids'])
+        related_ids = message_info.get('related_message_ids', [])
+        if related_ids:
+            try:
+                related_ids_json = json.dumps(related_ids)
+            except (TypeError, ValueError) as e:
+                logger.warning(f"序列化 related_message_ids 失败: {e}")
+                related_ids_json = None
         
-        # 保存到数据库
-        post_id = None
-        async with get_db() as conn:
-            cursor = await conn.cursor()
-            await cursor.execute("""
-                INSERT INTO published_posts 
-                (message_id, user_id, username, title, tags, link, note,
-                 content_type, file_ids, caption, filename, publish_time, last_update, related_message_ids)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                message_id,
-                user_id,
-                username,
-                title,
-                tags,
-                link,
-                note,
-                content_type,
-                file_ids,
-                caption,
-                filename,
-                publish_time.timestamp() if isinstance(publish_time, datetime) else publish_time,
-                datetime.now().timestamp(),
-                related_ids_json
-            ))
-            post_id = cursor.lastrowid
-            await conn.commit()
-            logger.info(f"已保存频道消息 {message_id} (post_id: {post_id}) 到数据库")
+        # 转换发布时间为时间戳
+        if isinstance(publish_time, datetime):
+            publish_timestamp = publish_time.timestamp()
+        elif isinstance(publish_time, (int, float)):
+            publish_timestamp = float(publish_time)
+        else:
+            logger.warning(f"发布时间格式无效: {publish_time}，使用当前时间")
+            publish_timestamp = datetime.now().timestamp()
         
-        # 添加到搜索索引
+        # 在单个事务中完成检查和插入
+        try:
+            async with get_db() as conn:
+                cursor = await conn.cursor()
+                
+                # 检查是否已存在（使用 SELECT FOR UPDATE 防止并发问题）
+                await cursor.execute(
+                    "SELECT message_id FROM published_posts WHERE message_id = ?",
+                    (message_id,)
+                )
+                if await cursor.fetchone():
+                    logger.debug(f"消息 {message_id} 已存在，跳过")
+                    return False
+                
+                # 插入新记录（使用参数化查询防止 SQL 注入）
+                try:
+                    await cursor.execute("""
+                        INSERT INTO published_posts 
+                        (message_id, user_id, username, title, tags, link, note,
+                         content_type, file_ids, caption, filename, publish_time, last_update, related_message_ids)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        message_id,
+                        user_id,
+                        username,
+                        title,
+                        tags,
+                        link,
+                        note,
+                        content_type,
+                        file_ids,
+                        caption,
+                        filename,
+                        publish_timestamp,
+                        datetime.now().timestamp(),
+                        related_ids_json
+                    ))
+                    post_id = cursor.lastrowid
+                    # 注意：get_db() 上下文管理器会自动 commit，不需要手动 commit
+                    logger.info(f"已保存频道消息 {message_id} (post_id: {post_id}) 到数据库")
+                except Exception as db_error:
+                    logger.error(f"插入数据库记录失败 (message_id: {message_id}): {db_error}", exc_info=True)
+                    # 尝试插入最小记录（只包含必要字段）
+                    try:
+                        await cursor.execute("""
+                            INSERT INTO published_posts 
+                            (message_id, user_id, username, title, publish_time, last_update)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                        """, (
+                            message_id,
+                            user_id,
+                            username,
+                            f"消息 {message_id}",
+                            publish_timestamp,
+                            datetime.now().timestamp()
+                        ))
+                        post_id = cursor.lastrowid
+                        logger.warning(f"已保存频道消息 {message_id} 的最小记录 (post_id: {post_id})")
+                    except Exception as fallback_error:
+                        logger.error(f"保存最小记录也失败 (message_id: {message_id}): {fallback_error}", exc_info=True)
+                        return False
+        except Exception as conn_error:
+            logger.error(f"数据库连接错误 (message_id: {message_id}): {conn_error}", exc_info=True)
+            return False
+        
+        # 添加到搜索索引（独立处理，失败不影响数据库保存）
         try:
             search_engine = get_search_engine()
+            
+            # 确保 publish_time 是 datetime 对象
+            if isinstance(publish_time, datetime):
+                publish_dt = publish_time
+            elif isinstance(publish_time, (int, float)):
+                publish_dt = datetime.fromtimestamp(float(publish_time))
+            else:
+                publish_dt = datetime.now()
             
             post_doc = PostDocument(
                 message_id=message_id,
@@ -561,7 +703,7 @@ async def save_channel_message(message_info: dict):
                 link=link,
                 user_id=user_id,
                 username=username,
-                publish_time=publish_time if isinstance(publish_time, datetime) else datetime.fromtimestamp(publish_time),
+                publish_time=publish_dt,
                 views=0,
                 heat_score=0
             )
@@ -570,10 +712,14 @@ async def save_channel_message(message_info: dict):
             logger.info(f"已添加频道消息 {message_id} (post_id: {post_id}) 到搜索索引")
             
         except Exception as e:
-            logger.error(f"添加到搜索索引失败: {e}", exc_info=True)
+            # 索引失败不影响整体流程，只记录错误
+            logger.error(f"添加到搜索索引失败（消息已保存到数据库）: {e}", exc_info=True)
+        
+        return True
             
     except Exception as e:
-        logger.error(f"保存频道消息失败: {e}", exc_info=True)
+        logger.error(f"保存频道消息失败 (message_id: {message_id}): {e}", exc_info=True)
+        return False
 
 
 async def handle_channel_message(update: Update, context: CallbackContext):
@@ -584,6 +730,9 @@ async def handle_channel_message(update: Update, context: CallbackContext):
         update: Telegram 更新对象
         context: 回调上下文
     """
+    message = None
+    message_id = None
+    
     try:
         # 只处理频道消息
         if not update.channel_post and not update.edited_channel_post:
@@ -591,53 +740,103 @@ async def handle_channel_message(update: Update, context: CallbackContext):
         
         message = update.channel_post or update.edited_channel_post
         
-        # 验证消息来源（通过 chat_id 或 username）
-        is_valid = False
-        if CHANNEL_ID.startswith('@'):
-            # 对于 @username 格式，通过 chat.username 验证
-            if message.chat.username:
-                is_valid = message.chat.username.lower() == CHANNEL_ID.lstrip('@').lower()
-            else:
-                # 如果没有 username，尝试通过 chat.id 验证（需要先获取频道信息）
-                try:
-                    chat = await context.bot.get_chat(CHANNEL_ID)
-                    is_valid = message.chat.id == chat.id
-                except Exception as e:
-                    logger.warning(f"无法验证频道ID: {e}")
-                    # 如果无法验证，默认接受（由 filters.Chat 过滤）
-                    is_valid = True
-        else:
-            # 对于数字ID格式，直接比较
-            try:
-                channel_id_int = int(CHANNEL_ID)
-                is_valid = message.chat.id == channel_id_int
-            except ValueError:
-                logger.warning(f"无法解析 CHANNEL_ID: {CHANNEL_ID}")
-                # 如果无法解析，默认接受（由 filters.Chat 过滤）
-                is_valid = True
-        
-        if not is_valid:
-            logger.debug(f"消息来自其他频道，跳过: {message.chat.id}")
+        # 安全获取消息ID
+        if not message:
+            logger.warning("消息对象为空")
             return
         
-        logger.info(f"收到频道消息: {message.message_id}")
+        message_id = getattr(message, 'message_id', None)
+        if not message_id:
+            logger.warning("无法获取消息ID")
+            return
         
-        # 提取消息信息
-        message_info = await extract_message_info(message)
+        # 并发控制：检查是否正在处理
+        async with _processing_lock:
+            if message_id in _processing_messages:
+                logger.debug(f"消息 {message_id} 正在处理中，跳过")
+                return
+            _processing_messages.add(message_id)
         
-        # 验证和规范化消息信息（处理不规范数据）
         try:
-            message_info = validate_and_normalize_message_info(message_info)
-        except Exception as e:
-            logger.error(f"验证消息信息失败: {e}", exc_info=True)
-            # 即使验证失败，也尝试保存（使用默认值）
-            logger.warning(f"使用默认值保存消息 {message_info.get('message_id', 'unknown')}")
+            # 验证消息来源（通过 chat_id 或 username）
+            is_valid = False
+            try:
+                if CHANNEL_ID.startswith('@'):
+                    # 对于 @username 格式，通过 chat.username 验证
+                    if hasattr(message, 'chat') and message.chat:
+                        chat_username = getattr(message.chat, 'username', None)
+                        if chat_username:
+                            is_valid = chat_username.lower() == CHANNEL_ID.lstrip('@').lower()
+                        else:
+                            # 如果没有 username，尝试通过 chat.id 验证（需要先获取频道信息）
+                            try:
+                                chat = await context.bot.get_chat(CHANNEL_ID)
+                                is_valid = message.chat.id == chat.id
+                            except Exception as e:
+                                logger.warning(f"无法验证频道ID: {e}")
+                                # 如果无法验证，默认接受（由 filters.Chat 过滤）
+                                is_valid = True
+                    else:
+                        logger.warning("消息缺少 chat 对象")
+                        is_valid = False
+                else:
+                    # 对于数字ID格式，直接比较
+                    try:
+                        channel_id_int = int(CHANNEL_ID)
+                        if hasattr(message, 'chat') and message.chat:
+                            is_valid = message.chat.id == channel_id_int
+                        else:
+                            is_valid = False
+                    except ValueError:
+                        logger.warning(f"无法解析 CHANNEL_ID: {CHANNEL_ID}")
+                        # 如果无法解析，默认接受（由 filters.Chat 过滤）
+                        is_valid = True
+            except Exception as e:
+                logger.error(f"验证频道来源时出错: {e}", exc_info=True)
+                is_valid = False
+            
+            if not is_valid:
+                logger.debug(f"消息来自其他频道，跳过: {getattr(message.chat, 'id', 'unknown') if hasattr(message, 'chat') else 'unknown'}")
+                return
+            
+            logger.info(f"收到频道消息: {message_id}")
+            
+            # 提取消息信息
+            message_info = await extract_message_info(message)
+            
+            # 验证 message_info 不为空
+            if not message_info or not isinstance(message_info, dict):
+                logger.error(f"提取的消息信息无效: {message_info}")
+                return
+            
+            # 验证和规范化消息信息（处理不规范数据）
+            try:
+                message_info = validate_and_normalize_message_info(message_info)
+            except Exception as e:
+                logger.error(f"验证消息信息失败: {e}", exc_info=True)
+                # 即使验证失败，也尝试保存（使用默认值）
+                logger.warning(f"使用默认值保存消息 {message_info.get('message_id', 'unknown')}")
+                # 确保 message_id 存在
+                if not message_info.get('message_id'):
+                    message_info['message_id'] = message_id
+            
+            # 保存到数据库
+            success = await save_channel_message(message_info)
+            
+            if success:
+                logger.info(f"频道消息 {message_id} 处理完成")
+            else:
+                logger.warning(f"频道消息 {message_id} 处理失败或已存在")
         
-        # 保存到数据库
-        await save_channel_message(message_info)
-        
-        logger.info(f"频道消息 {message.message_id} 处理完成")
+        finally:
+            # 移除处理标记
+            async with _processing_lock:
+                _processing_messages.discard(message_id)
         
     except Exception as e:
-        logger.error(f"处理频道消息失败: {e}", exc_info=True)
+        logger.error(f"处理频道消息失败 (message_id: {message_id}): {e}", exc_info=True)
+        # 确保清理处理标记
+        if message_id:
+            async with _processing_lock:
+                _processing_messages.discard(message_id)
 
