@@ -4,17 +4,25 @@
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org)
+[![Telegram Bot](https://img.shields.io/badge/Telegram-Bot-blue.svg)](https://core.telegram.org/bots)
+[![Docker](https://img.shields.io/badge/Docker-Supported-blue.svg)](https://www.docker.com)
+
+**TeleSubmit v2** 是一个开源的 Telegram 频道内容管理系统，专为频道管理员和内容创作者设计。支持用户投稿、自动审核、全文搜索、热度统计等功能，帮助您高效管理 Telegram 频道内容。
 
 ---
 
 ## ✨ 核心功能
 
-- 📤 **投稿管理** - 支持图片、视频、文档批量上传
+- 📤 **投稿管理** - 支持图片、视频、文档批量上传，支持多种媒体格式
 - 📢 **频道监听** - 自动监听频道消息，智能提取标签和内容，自动同步到数据库和搜索索引
-- 🔍 **全文搜索** - 中文分词优化，支持标题/标签/文件名搜索
-- 📊 **热度统计** - 智能热度算法，自动生成排行榜
-- 🏷️ **标签系统** - 标签云可视化，快速分类内容
-- 🚫 **权限管理** - 黑名单系统，灵活控制用户权限
+- 🔍 **全文搜索** - 基于 Whoosh 搜索引擎，中文分词优化（jieba/simple），支持标题/标签/文件名多字段搜索
+- 📊 **热度统计** - 智能热度算法，自动生成排行榜，支持按时间范围筛选
+- 🏷️ **标签系统** - 标签云可视化，快速分类内容，支持标签搜索和统计
+- 🚫 **权限管理** - 黑名单系统，灵活控制用户权限，支持管理员命令
+- 🔄 **双模式运行** - 支持 Polling 和 Webhook 两种运行模式，适应不同部署场景
+- 🐳 **容器化部署** - 提供 Docker 和 Docker Compose 支持，一键部署
+- 💾 **数据持久化** - 基于 SQLite 数据库，支持数据备份和恢复
+- 🎯 **内存优化** - 支持多种内存模式，最低仅需 80-120 MB 内存
 
 ---
 
@@ -335,11 +343,27 @@ TeleSubmit-v2/
 
 ---
 
+## 🛠️ 技术栈
+
+- **语言**: Python 3.9+
+- **框架**: python-telegram-bot 21.10+
+- **搜索引擎**: Whoosh 2.7.4+
+- **中文分词**: jieba 0.42.1+ (可选)
+- **数据库**: SQLite (通过 aiosqlite)
+- **容器化**: Docker & Docker Compose
+- **Web 框架**: aiohttp (Webhook 模式)
+
 ## 📄 许可证
 
 本项目采用 [MIT 许可证](LICENSE)。
 
----
+## 🌟 适用场景
+
+- **内容社区管理**: 管理用户投稿，审核内容质量
+- **资源分享频道**: 组织和管理分享的资源，支持搜索和分类
+- **新闻资讯频道**: 收集和整理新闻资讯，支持标签分类
+- **学习资料频道**: 管理学习资料，支持全文搜索和热度排序
+- **技术分享频道**: 技术文章和代码分享，支持标签和搜索
 
 ## 💬 帮助与支持
 
