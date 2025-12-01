@@ -306,7 +306,7 @@ make test-cov
 - ✅ **文件验证器**: 100% 覆盖率，15个测试用例
 - ✅ **工具函数**: 98% 覆盖率，10+个测试用例
 
-详见 [完整测试指南](TESTING.md) 和 [测试覆盖报告](TEST_COVERAGE_REPORT.md)
+详见 [完整测试指南](TESTING.md) 和 [测试套件说明](tests/README.md)
 
 ---
 
