@@ -96,8 +96,8 @@ class MessageFormatter:
 • 📈 详细数据分析
 • 🎯 个性化推荐
 
-<b>👨‍💻 开发者：</b> TeleSubmit Team
-<b>📦 开源地址：</b> GitHub
+<b>👨‍💻 开发者：</b> zoidberg-xgd
+<b>📦 开源地址：</b> https://github.com/zoidberg-xgd/TeleSubmit-v2
 
 <i>感谢使用！如有问题请联系管理员。</i>
 """

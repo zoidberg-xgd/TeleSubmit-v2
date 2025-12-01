@@ -152,10 +152,21 @@ docs/*_test.py
 docs/*_debug.py
 docs/*_verify.py
 
-# 其他临时文件
-*.pyc
+# 测试相关文件
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
+coverage.xml
+report.xml
+.tox/
+*.cover
+.hypothesis/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# 其他临时文件
+*.pyc
 .last_backup
 config.ini.backup.*

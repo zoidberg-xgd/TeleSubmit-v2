@@ -1,0 +1,156 @@
+# 测试相关的 Makefile 命令
+
+.PHONY: test test-unit test-integration test-cov test-html test-fast test-slow clean-test
+
+# 运行所有测试
+test:
+	@echo "🧪 运行所有测试..."
+	pytest
+
+# 只运行单元测试
+test-unit:
+	@echo "🧪 运行单元测试..."
+	pytest -m unit
+
+# 只运行集成测试
+test-integration:
+	@echo "🧪 运行集成测试..."
+	pytest -m integration
+
+# 运行测试并生成覆盖率报告
+test-cov:
+	@echo "📊 运行测试并生成覆盖率报告..."
+	pytest --cov=. --cov-report=term-missing
+
+# 生成 HTML 覆盖率报告
+test-html:
+	@echo "📊 生成 HTML 覆盖率报告..."
+	pytest --cov=. --cov-report=html
+	@echo "✅ 报告已生成到 htmlcov/index.html"
+
+# 快速测试（跳过慢速测试）
+test-fast:
+	@echo "⚡ 运行快速测试..."
+	pytest -m "not slow"
+
+# 运行慢速测试
+test-slow:
+	@echo "🐌 运行慢速测试..."
+	pytest -m slow
+
+# 运行数据库测试
+test-db:
+	@echo "🗄️  运行数据库测试..."
+	pytest -m database
+
+# 测试特定文件
+test-file:
+	@echo "📄 测试指定文件..."
+	@if [ -z "$(FILE)" ]; then \
+		echo "❌ 请指定文件: make test-file FILE=tests/test_xxx.py"; \
+		exit 1; \
+	fi
+	pytest $(FILE)
+
+# 详细输出模式
+test-verbose:
+	@echo "📢 详细输出模式..."
+	pytest -v
+
+# 并行运行测试（需要 pytest-xdist）
+test-parallel:
+	@echo "⚡ 并行运行测试..."
+	pytest -n auto
+
+# 运行并进入调试模式
+test-debug:
+	@echo "🐛 调试模式..."
+	pytest --pdb
+
+# 显示最慢的 10 个测试
+test-profile:
+	@echo "⏱️  分析测试性能..."
+	pytest --durations=10
+
+# 只运行上次失败的测试
+test-failed:
+	@echo "🔄 运行上次失败的测试..."
+	pytest --lf
+
+# 清理测试缓存和报告
+clean-test:
+	@echo "🧹 清理测试文件..."
+	rm -rf .pytest_cache
+	rm -rf htmlcov
+	rm -rf .coverage
+	rm -rf *.pyc
+	rm -rf __pycache__
+	find . -type d -name "__pycache__" -exec rm -rf {} +
+	find . -type f -name "*.pyc" -delete
+	@echo "✅ 清理完成"
+
+# 安装测试依赖
+install-test:
+	@echo "📦 安装测试依赖..."
+	pip install pytest pytest-asyncio pytest-cov pytest-mock coverage
+
+# 检查测试覆盖率并生成报告
+coverage-report:
+	@echo "📊 生成完整覆盖率报告..."
+	pytest --cov=. --cov-report=html --cov-report=term-missing --cov-report=xml
+	@echo "✅ HTML 报告: htmlcov/index.html"
+	@echo "✅ XML 报告: coverage.xml"
+
+# 监控文件变化自动运行测试（需要 pytest-watch）
+watch:
+	@echo "👀 监控文件变化..."
+	@command -v ptw >/dev/null 2>&1 || { \
+		echo "❌ pytest-watch 未安装"; \
+		echo "📦 安装: pip install pytest-watch"; \
+		exit 1; \
+	}
+	ptw
+
+# 生成测试报告（JUnit XML）
+test-report:
+	@echo "📄 生成测试报告..."
+	pytest --junitxml=report.xml
+	@echo "✅ 报告已生成到 report.xml"
+
+# 运行测试并在浏览器打开覆盖率报告
+test-open:
+	@echo "🧪 运行测试并打开报告..."
+	pytest --cov=. --cov-report=html
+	@if [ "$(shell uname)" = "Darwin" ]; then \
+		open htmlcov/index.html; \
+	elif [ "$(shell uname)" = "Linux" ]; then \
+		xdg-open htmlcov/index.html; \
+	else \
+		echo "✅ 报告已生成到 htmlcov/index.html"; \
+	fi
+
+# 帮助信息
+help-test:
+	@echo "📚 测试命令帮助："
+	@echo ""
+	@echo "  make test              - 运行所有测试"
+	@echo "  make test-unit         - 只运行单元测试"
+	@echo "  make test-integration  - 只运行集成测试"
+	@echo "  make test-cov          - 运行测试并显示覆盖率"
+	@echo "  make test-html         - 生成 HTML 覆盖率报告"
+	@echo "  make test-fast         - 快速测试（跳过慢速测试）"
+	@echo "  make test-slow         - 运行慢速测试"
+	@echo "  make test-db           - 运行数据库测试"
+	@echo "  make test-file FILE=<path> - 测试指定文件"
+	@echo "  make test-verbose      - 详细输出模式"
+	@echo "  make test-parallel     - 并行运行测试"
+	@echo "  make test-debug        - 调试模式"
+	@echo "  make test-profile      - 显示最慢的测试"
+	@echo "  make test-failed       - 只运行上次失败的测试"
+	@echo "  make test-open         - 运行测试并打开覆盖率报告"
+	@echo "  make clean-test        - 清理测试文件"
+	@echo "  make install-test      - 安装测试依赖"
+	@echo "  make coverage-report   - 生成完整覆盖率报告"
+	@echo "  make watch             - 监控文件变化自动运行测试"
+	@echo "  make test-report       - 生成 JUnit XML 报告"
+	@echo ""

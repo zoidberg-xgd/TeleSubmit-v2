@@ -1,0 +1,36 @@
+[run]
+# 代码覆盖率配置
+source = .
+omit = 
+    */tests/*
+    */venv/*
+    */env/*
+    */.venv/*
+    */site-packages/*
+    setup.py
+    conftest.py
+    */__pycache__/*
+    */migrations/*
+    */scripts/*
+    *_test.py
+    test_*.py
+
+[report]
+# 报告配置
+precision = 2
+show_missing = True
+skip_covered = False
+
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    @abstractmethod
+    @abc.abstractmethod
+    pass
+
+[html]
+directory = htmlcov

@@ -268,6 +268,7 @@ ANALYZER = simple  # 轻量级，节省 ~140MB 内存
 | [Webhook 模式](docs/WEBHOOK_MODE.md) | Webhook 完整配置指南 |
 | [管理员指南](ADMIN_GUIDE.md) | 管理功能、系统维护 |
 | [内存优化](MEMORY_USAGE.md) | 内存使用分析与优化 |
+| [测试指南](TESTING.md) | 测试框架、编写和运行测试 |
 | [更新日志](CHANGELOG.md) | 版本历史、功能更新 |
 
 ### 推荐阅读顺序
@@ -276,6 +277,36 @@ ANALYZER = simple  # 轻量级，节省 ~140MB 内存
 2. **日常使用**: README（命令部分）
 3. **系统维护**: [管理员指南](ADMIN_GUIDE.md)
 4. **生产部署**: [Webhook 模式指南](docs/WEBHOOK_MODE.md)
+5. **开发测试**: [测试指南](TESTING.md)
+
+---
+
+## 🧪 测试
+
+项目包含完整的测试套件，覆盖核心功能模块。
+
+### 快速测试
+
+```bash
+# 运行所有测试
+pytest
+
+# 生成覆盖率报告
+pytest --cov=. --cov-report=html
+open htmlcov/index.html
+
+# 使用 Makefile
+make test-cov
+```
+
+### 测试覆盖
+
+- ✅ **热度计算器**: 86% 覆盖率，9个测试用例
+- ✅ **UI消息格式化**: 90% 覆盖率，30个测试用例  
+- ✅ **文件验证器**: 100% 覆盖率，15个测试用例
+- ✅ **工具函数**: 98% 覆盖率，10+个测试用例
+
+详见 [完整测试指南](TESTING.md) 和 [测试覆盖报告](TEST_COVERAGE_REPORT.md)
 
 ---
 
