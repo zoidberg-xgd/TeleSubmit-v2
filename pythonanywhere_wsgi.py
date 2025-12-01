@@ -24,6 +24,10 @@ if project_home not in sys.path:
 # 切换工作目录到项目根目录
 os.chdir(project_home)
 
+# 确保 logs 目录存在
+logs_dir = os.path.join(project_home, 'logs')
+os.makedirs(logs_dir, exist_ok=True)
+
 # 设置日志
 logging.basicConfig(
     level=logging.INFO,

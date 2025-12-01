@@ -161,7 +161,7 @@ USERNAME = 'yourusername'  # 修改这里！例如: USERNAME = 'john123'
    - 删除所有内容，替换为以下代码：
 
 ```python
-# ⭐⭐⭐ 重要：将下面两处的 'yourusername' 替换为你的实际用户名 ⭐⭐⭐
+# ⭐ 重要：将下面的 'yourusername' 替换为你的实际用户名 ⭐
 import sys
 import os
 
@@ -190,16 +190,23 @@ from pythonanywhere_wsgi import application
 在 Bash 控制台执行以下命令设置 Webhook：
 
 ```bash
-# 替换为你的 Bot Token 和用户名
-curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
+# ⚠️ 注意：将 YOUR_BOT_TOKEN 和 yourusername 替换为实际值，不要保留 <> 符号
+curl -X POST "https://api.telegram.org/botYOUR_BOT_TOKEN/setWebhook" \
   -d "url=https://yourusername.pythonanywhere.com/webhook" \
+  -d "max_connections=40"
+```
+
+**示例**（假设 Token 是 `123456:ABC-DEF`，用户名是 `john`）：
+```bash
+curl -X POST "https://api.telegram.org/bot123456:ABC-DEF/setWebhook" \
+  -d "url=https://john.pythonanywhere.com/webhook" \
   -d "max_connections=40"
 ```
 
 **验证 Webhook 设置**：
 
 ```bash
-curl "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getWebhookInfo"
+curl "https://api.telegram.org/botYOUR_BOT_TOKEN/getWebhookInfo"
 ```
 
 应该看到类似输出：
@@ -259,8 +266,8 @@ curl https://yourusername.pythonanywhere.com/health
 **解决方法**：
 
 ```bash
-# 1. 检查 Webhook 状态
-curl "https://api.telegram.org/bot<TOKEN>/getWebhookInfo"
+# 1. 检查 Webhook 状态（将 YOUR_BOT_TOKEN 替换为实际 Token）
+curl "https://api.telegram.org/botYOUR_BOT_TOKEN/getWebhookInfo"
 
 # 2. 查看错误日志
 # 在 Web 页面查看 error.log
@@ -332,11 +339,11 @@ CACHE_SIZE_KB = 512
 **解决方法**：
 
 ```bash
-# 删除旧的 Webhook
-curl -X POST "https://api.telegram.org/bot<TOKEN>/deleteWebhook"
+# 删除旧的 Webhook（将 YOUR_BOT_TOKEN 替换为实际 Token）
+curl -X POST "https://api.telegram.org/botYOUR_BOT_TOKEN/deleteWebhook"
 
 # 重新设置正确的 Webhook
-curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
+curl -X POST "https://api.telegram.org/botYOUR_BOT_TOKEN/setWebhook" \
   -d "url=https://yourusername.pythonanywhere.com/webhook"
 
 # 重新加载 Web App
