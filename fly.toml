@@ -1,0 +1,66 @@
+# Fly.io 应用配置文件
+# TeleSubmit v2 - Telegram 投稿机器人
+
+# 应用名称（留空将在 fly launch 时自动生成或提示输入）
+app = ""
+
+# 主区域（可在 fly launch 时选择）
+primary_region = ""
+
+# 构建配置
+[build]
+  dockerfile = "Dockerfile"
+
+# 环境变量（非敏感信息）
+[env]
+  # 运行模式：必须设置为 WEBHOOK
+  RUN_MODE = "WEBHOOK"
+  
+  # Webhook 配置
+  WEBHOOK_PORT = "8080"
+  WEBHOOK_PATH = "/webhook"
+  
+  # 搜索引擎优化（使用轻量级分词器节省内存）
+  SEARCH_ANALYZER = "simple"
+  
+  # 数据库缓存优化（KB）
+  DB_CACHE_KB = "1024"
+  
+  # 时区
+  TZ = "Asia/Shanghai"
+
+# HTTP 服务配置
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+  
+  # 健康检查
+  [http_service.checks]
+    [http_service.checks.health]
+      grace_period = "10s"
+      interval = "30s"
+      method = "GET"
+      timeout = "5s"
+      path = "/health"
+
+# 虚拟机配置
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 256
+
+# 挂载持久化存储（可选，用于数据持久化）
+# 取消注释以下配置来启用持久化存储
+# [[mounts]]
+#   source = "telesubmit_data"
+#   destination = "/app/data"
+#   initial_size = "1gb"
+
+# 注意：
+# 1. 敏感信息（BOT_TOKEN, CHANNEL_ID, OWNER_ID, WEBHOOK_URL）应使用 flyctl secrets set 设置
+# 2. 首次部署使用: flyctl launch
+# 3. 设置密钥: flyctl secrets set BOT_TOKEN=xxx CHANNEL_ID=@xxx OWNER_ID=xxx WEBHOOK_URL=https://xxx.fly.dev
+# 4. 后续部署使用: flyctl deploy

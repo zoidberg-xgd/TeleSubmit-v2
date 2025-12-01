@@ -1,0 +1,66 @@
+# Git 相关
+.git
+.gitignore
+.gitattributes
+.github
+
+# Python 相关
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info
+dist
+build
+.eggs
+*.egg
+.pytest_cache
+.coverage
+htmlcov
+
+# 环境
+.env
+.venv
+env/
+venv/
+ENV/
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# 数据文件（运行时生成）
+data/*.db
+data/search_index/*
+logs/*.log
+*.db
+
+# 文档
+*.md
+docs/
+tests/
+htmlcov/
+
+# 配置示例文件
+config.ini.example
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Fly.io
+fly.toml
+
+# 部署脚本
+*.sh
+
+# 其他
+.DS_Store
+*.pyc
+*.pyo
+.cache

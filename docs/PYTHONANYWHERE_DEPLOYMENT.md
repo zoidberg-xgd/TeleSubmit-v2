@@ -6,11 +6,38 @@
 
 ## 📋 前提条件
 
+### 账号要求
+
+> **💡 强烈推荐使用付费账号**
+> 
+> - ✅ **推荐**：PythonAnywhere 付费账号（Hacker 计划 $5/月起）
+>   - 支持访问外部 API（可以发送 Telegram 消息）
+>   - 提供 HTTPS 域名
+>   - 更稳定的运行环境
+> 
+> - ⚠️ **不推荐**：免费账号
+>   - **无法发送** Telegram 消息（无法访问 `api.telegram.org`）
+>   - 只能接收消息，无法回复
+>   - **机器人基本无法正常工作**
+> 
+> **结论**：免费账号无法正常运行此机器人，请使用付费账号。
+
 ### 必需信息
 
 - Telegram Bot Token（从 [@BotFather](https://t.me/BotFather) 获取）
 - 频道 ID 或用户名
 - 管理员 User ID（从 [@userinfobot](https://t.me/userinfobot) 获取）
+- **一台可以访问互联网的设备**（本地电脑或手机）用于设置 Webhook
+
+### ⚠️ PythonAnywhere 网络限制说明
+
+PythonAnywhere 对外部 API 访问有限制，这意味着：
+
+- ✅ **机器人可以正常运行**：Telegram 会主动推送消息到您的服务器（Webhook 模式）
+- ❌ **无法在 PythonAnywhere 上设置 Webhook**：需要在本地电脑执行设置命令
+- ✅ **部署后机器人工作正常**：一旦 Webhook 设置完成，机器人接收和发送消息都没有问题
+
+**简而言之**：部署在 PythonAnywhere，但设置 Webhook 需要在本地完成。
 
 ---
 
@@ -187,7 +214,16 @@ from pythonanywhere_wsgi import application
 
 ### 第六步：设置 Webhook
 
-在 Bash 控制台执行以下命令设置 Webhook：
+> **⚠️ 重要提示：网络限制**
+> 
+> PythonAnywhere 限制了对外部 API 的访问，**无法在 PythonAnywhere 服务器上**直接执行 `curl` 命令访问 Telegram API。
+> 
+> **解决方法**：
+> - ✅ **推荐**：在**您的本地电脑**执行以下命令（不是在 PythonAnywhere 上）
+> - ✅ 或使用任何可以访问互联网的设备执行
+> - ⚠️ 如果在 PythonAnywhere 上执行会看到 `HTTP code 503 from proxy` 错误
+
+**在您的本地电脑**执行以下命令设置 Webhook：
 
 ```bash
 # ⚠️ 注意：将 YOUR_BOT_TOKEN 和 yourusername 替换为实际值，不要保留 <> 符号
@@ -203,7 +239,7 @@ curl -X POST "https://api.telegram.org/bot123456:ABC-DEF/setWebhook" \
   -d "max_connections=40"
 ```
 
-**验证 Webhook 设置**：
+**验证 Webhook 设置**（也在本地执行）：
 
 ```bash
 curl "https://api.telegram.org/botYOUR_BOT_TOKEN/getWebhookInfo"
@@ -256,7 +292,27 @@ curl https://yourusername.pythonanywhere.com/health
 
 ## 🔧 常见问题解决
 
-### 问题 1：机器人无响应
+### 问题 1：设置 Webhook 时出现 503 错误
+
+**症状**：在 PythonAnywhere 上执行 `curl` 命令时看到：
+```
+curl: (56) Received HTTP code 503 from proxy after CONNECT
+```
+
+**原因**：PythonAnywhere 限制了对外部 API 的访问。
+
+**解决方法**：
+
+✅ **在本地电脑执行命令**（不是在 PythonAnywhere 上）：
+```bash
+curl -X POST "https://api.telegram.org/botYOUR_BOT_TOKEN/setWebhook" \
+  -d "url=https://yourusername.pythonanywhere.com/webhook" \
+  -d "max_connections=40"
+```
+
+参见上文"[第六步：设置 Webhook](#第六步设置-webhook)"的详细说明。
+
+### 问题 2：机器人无响应
 
 **可能原因**：
 1. Webhook 未正确设置
@@ -279,7 +335,7 @@ pip3.9 install --user --force-reinstall -r requirements.txt
 # 在 Web 页面点击 Reload 按钮
 ```
 
-### 问题 2：导入模块失败
+### 问题 3：导入模块失败
 
 **症状**：日志显示 `ModuleNotFoundError`
 
@@ -296,7 +352,7 @@ nano /var/www/yourusername_pythonanywhere_com_wsgi.py
 # project_home = '/home/yourusername/TeleSubmit-v2'
 ```
 
-### 问题 3：数据库权限错误
+### 问题 4：数据库权限错误
 
 **症状**：日志显示数据库无法创建或写入
 
@@ -312,7 +368,7 @@ chmod 755 data
 ls -la data/
 ```
 
-### 问题 4：内存不足
+### 问题 5：内存不足
 
 **症状**：应用频繁重启或崩溃
 
@@ -332,11 +388,11 @@ CACHE_SIZE_KB = 512
 
 然后重新加载 Web App。
 
-### 问题 5：Webhook URL 不匹配
+### 问题 6：Webhook URL 不匹配
 
 **症状**：`getWebhookInfo` 显示的 URL 与配置不一致
 
-**解决方法**：
+**解决方法**（⚠️ 在本地电脑执行）：
 
 ```bash
 # 删除旧的 Webhook（将 YOUR_BOT_TOKEN 替换为实际 Token）
@@ -345,9 +401,9 @@ curl -X POST "https://api.telegram.org/botYOUR_BOT_TOKEN/deleteWebhook"
 # 重新设置正确的 Webhook
 curl -X POST "https://api.telegram.org/botYOUR_BOT_TOKEN/setWebhook" \
   -d "url=https://yourusername.pythonanywhere.com/webhook"
-
-# 重新加载 Web App
 ```
+
+然后在 PythonAnywhere Web 页面重新加载 Web App。
 
 ---
 

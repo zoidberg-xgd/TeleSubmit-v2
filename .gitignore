@@ -133,15 +133,10 @@ MEMORY_*.md
 !MEMORY_USAGE.md
 analyze_memory.py
 
-# Fly.io 部署相关（不推送）
-fly.toml
+# Fly.io 部署相关（临时文件）
 flyio.env.template
-deploy_fly.sh
-deploy_flyio.sh
 health.py
-FLYIO_*.md
 DEPLOYMENT_SUMMARY.md
-.dockerignore
 
 # Webhook 测试报告和调试文档（临时）
 WEBHOOK_TEST_REPORT.md
