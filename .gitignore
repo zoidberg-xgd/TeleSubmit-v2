@@ -86,6 +86,7 @@ delete_posts_by_id.py
 test_commands.py
 test_tag_cloud.py
 test_*.py
+!tests/test_*.py
 fix_*.py
 fetch_*.py
 migrate_*.py

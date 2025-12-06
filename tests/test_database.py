@@ -14,16 +14,13 @@ class TestDatabaseInitialization:
     @pytest.mark.database
     def test_database_creation(self, temp_dir):
         """测试数据库创建"""
-        from utils.database import initialize_database
+        from unittest.mock import patch
         
         db_path = os.path.join(temp_dir, 'test.db')
         
-        # 设置测试数据库路径
-        import config.settings as settings
-        original_path = getattr(settings, 'DB_PATH', None)
-        settings.DB_PATH = db_path
-        
-        try:
+        # 使用 patch 来设置测试数据库路径
+        with patch('utils.database.SESSION_DB_PATH', db_path):
+            from utils.database import initialize_database
             initialize_database()
             
             # 验证数据库文件已创建
@@ -44,11 +41,6 @@ class TestDatabaseInitialization:
             
             # 应该有一些表被创建
             assert len(tables) > 0
-            
-        finally:
-            # 恢复原始路径
-            if original_path:
-                settings.DB_PATH = original_path
 
 
 class TestDatabaseOperations:

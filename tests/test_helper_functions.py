@@ -43,14 +43,13 @@ class TestHelperFunctions:
     @pytest.mark.unit
     def test_process_tags_limit(self):
         """测试标签数量限制"""
-        # 假设 ALLOWED_TAGS = 5
-        long_tags = "tag1,tag2,tag3,tag4,tag5,tag6,tag7,tag8"
+        from config.settings import ALLOWED_TAGS
+        long_tags = ",".join([f"tag{i}" for i in range(ALLOWED_TAGS + 5)])
         success, result = process_tags(long_tags)
         
         assert success is True
         tags = result.split()
-        # 应该最多有5个标签
-        assert len(tags) <= 5
+        assert len(tags) <= ALLOWED_TAGS
     
     @pytest.mark.unit
     def test_process_tags_empty(self):
@@ -110,15 +109,9 @@ class TestHelperFunctions:
     @pytest.mark.unit
     def test_build_caption_basic(self):
         """测试基本标题构建"""
-        class MockData:
-            link = "https://example.com"
-            title = "测试标题"
-            note = "测试内容"
-            tags = "#测试 #Python"
-            spoiler = "false"
-            user_id = 123456789
-        
-        result = build_caption(MockData())
+        # Using dict instead of class
+        data = {"link": "https://example.com", "title": "测试标题", "note": "测试内容", "tags": "#测试 #Python", "spoiler": "false", "user_id": 123456789}
+        result = build_caption(data)
         
         assert isinstance(result, str)
         assert len(result) > 0
@@ -126,45 +119,27 @@ class TestHelperFunctions:
     @pytest.mark.unit
     def test_build_caption_empty_fields(self):
         """测试空字段的标题构建"""
-        class MockData:
-            link = ""
-            title = ""
-            note = ""
-            tags = ""
-            spoiler = "false"
-            user_id = 123456789
-        
-        result = build_caption(MockData())
+        # Using dict instead of class
+        data = {"link": "", "title": "", "note": "", "tags": "", "spoiler": "false", "user_id": 123456789}
+        result = build_caption(data)
         
         assert isinstance(result, str)
     
     @pytest.mark.unit
     def test_build_caption_with_spoiler(self):
         """测试带剧透标记的标题"""
-        class MockData:
-            link = ""
-            title = "测试"
-            note = "内容"
-            tags = ""
-            spoiler = "true"
-            user_id = 123456789
-        
-        result = build_caption(MockData())
+        # Using dict instead of class
+        data = {"link": "", "title": "测试", "note": "内容", "tags": "", "spoiler": "true", "user_id": 123456789}
+        result = build_caption(data)
         
         assert "⚠️" in result or "点击查看" in result
     
     @pytest.mark.unit
     def test_build_caption_length_limit(self):
         """测试标题长度限制"""
-        class MockData:
-            link = "https://example.com"
-            title = "标题" * 100
-            note = "内容" * 500
-            tags = "#标签 " * 50
-            spoiler = "false"
-            user_id = 123456789
-        
-        result = build_caption(MockData())
+        # Using dict instead of class
+        data = {"link": "https://example.com", "title": "标题" * 100, "note": "内容" * 500, "tags": "#标签 " * 50, "spoiler": "false", "user_id": 123456789}
+        result = build_caption(data)
         
         # Telegram caption 最大长度为 1024
         assert len(result) <= 1024

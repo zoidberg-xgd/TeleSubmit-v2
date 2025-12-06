@@ -44,8 +44,14 @@ def process_tags(raw_tags: str) -> tuple:
         tags = [t.strip().lower() for t in TAG_SPLIT_PATTERN.split(raw_tags) if t.strip()]
         tags = tags[:ALLOWED_TAGS]
         
-        # 确保每个标签前加上#，如果标签已经有#，则不重复添加
-        processed = [f"#{tag}" if not tag.startswith("#") else tag for tag in tags]
+        # 移除标签前的所有#号，然后统一添加一个#
+        # 这样可以处理 ##tag, ###tag 等情况
+        processed = []
+        for tag in tags:
+            # 移除开头的所有#号
+            clean_tag = tag.lstrip('#')
+            if clean_tag:  # 确保移除#后还有内容
+                processed.append(f"#{clean_tag}")
         
         # 处理标签长度超过30的情况
         processed = [tag[:30] if len(tag) > 0 else tag for tag in processed]
@@ -114,34 +120,40 @@ def build_caption(data) -> str:
     # 收集各部分，只有内容不为空时才添加，避免产生多余的换行
     parts = []
     
+    # 初始化变量，防止后续引用时未定义
+    link = ""
+    title = ""
+    note = ""
+    tags = ""
+    
     # 安全获取属性，防止访问不存在的键
     try:
         link = get_link_part(data["link"] if data["link"] else "")
         if link:
             parts.append(link)
     except (KeyError, TypeError):
-        pass
+        link = ""
 
     try:
         title = get_title_part(data["title"] if data["title"] else "")
         if title:
             parts.append(title)
     except (KeyError, TypeError):
-        pass
+        title = ""
 
     try:
         note = get_note_part(data["note"] if data["note"] else "")
         if note:
             parts.append(note)
     except (KeyError, TypeError):
-        pass
+        note = ""
 
     try:
         tags = get_tags_part(data["tags"] if data["tags"] else "")
         if tags:
             parts.append(tags)
     except (KeyError, TypeError):
-        pass
+        tags = ""
     
     # 将各部分按换行符连接，避免空值带来多余换行
     caption_body = "\n".join(parts)
