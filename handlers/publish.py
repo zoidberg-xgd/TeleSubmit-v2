@@ -192,7 +192,9 @@ async def publish_submission(update: Update, context: CallbackContext) -> int:
             await update.message.reply_text("❌ 未检测到任何上传文件，请重新发送 /start")
             return ConversationHandler.END
 
-        spoiler_flag = True if data["spoiler"].lower() == "true" else False
+        # 安全处理spoiler字段，防止None值导致AttributeError
+        spoiler_value = data["spoiler"] if "spoiler" in data.keys() and data["spoiler"] else "false"
+        spoiler_flag = spoiler_value.lower() == "true"
         sent_message = None
         all_message_ids = []  # 用于记录所有发送的消息ID
         
