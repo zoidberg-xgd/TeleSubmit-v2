@@ -32,10 +32,10 @@
 4. **频道设置**
    - 将 Bot 添加为频道管理员
    - 授予以下权限：
-     - ✓ 发送消息
-     - ✓ 编辑消息
-     - ✓ 删除消息
-     - ✓ 管理消息
+     - 发送消息
+     - 编辑消息
+     - 删除消息
+     - 管理消息
 
 ## 部署方式
 
@@ -85,20 +85,20 @@ nano config.ini  # 编辑配置文件
 ./deploy.sh
 ```
 
-**⚡️ 快速启动选项**：
+**快速启动选项**：
 
 如果您已经有构建好的镜像，想要快速重启服务（跳过漫长的构建过程）：
 
 ```bash
-# ⚡️ 快速启动模式（推荐日常使用）
+# 快速启动模式（推荐日常使用）
 ./deploy.sh --fast
 ```
 
 这个选项会：
-- ✅ 跳过 Docker 镜像构建
-- ✅ 直接使用现有镜像启动
-- ✅ 几秒钟内完成部署
-- ⚠️ 需要先有已构建的镜像
+- 跳过 Docker 镜像构建
+- 直接使用现有镜像启动
+- 几秒钟内完成部署
+- 需要先有已构建的镜像
 
 **在网络受限环境中使用代理**：
 
@@ -128,7 +128,7 @@ nano config.ini  # 编辑配置文件
 - V2Ray: `http://127.0.0.1:10809`
 - Shadowsocks: `socks5://127.0.0.1:1080` (需转换为 http)
 
-> 💡 **提示**：确保代理软件已启动并开启"允许局域网连接"选项
+> **提示**：确保代理软件已启动并开启"允许局域网连接"选项
 
 **Docker 优势**：
 - 环境隔离，不影响主机
@@ -708,7 +708,9 @@ crontab -e
 
 ## 相关文档
 
-- [部署故障排查](DEPLOY_TROUBLESHOOTING.md) - 解决部署过程中的常见问题
+- [Webhook 模式指南](docs/WEBHOOK_MODE.md) - Webhook 模式完整指南
+- [Fly.io 部署指南](docs/FLYIO_DEPLOYMENT.md) - Fly.io 平台部署指南
+- [PythonAnywhere 部署指南](docs/PYTHONANYWHERE_DEPLOYMENT.md) - PythonAnywhere 平台部署指南
 - [脚本使用指南](SCRIPTS_GUIDE.md) - 所有管理脚本详细说明
 - [管理员指南](ADMIN_GUIDE.md) - 管理功能和系统维护
 - [索引管理器](INDEX_MANAGER_README.md) - 搜索索引管理
@@ -718,7 +720,7 @@ crontab -e
 ## 获取帮助
 
 如果遇到问题：
-1. **部署阶段问题**：查看 [部署故障排查指南](DEPLOY_TROUBLESHOOTING.md)
+1. **部署阶段问题**：查看 [故障排查](#故障排查) 章节
 2. 查看日志文件：`logs/bot.log` 和 `logs/error.log`
 3. 检查配置：`python3 check_config.py`
 4. 提交 Issue 到 GitHub 仓库

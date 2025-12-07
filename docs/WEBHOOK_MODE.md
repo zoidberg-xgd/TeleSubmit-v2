@@ -15,7 +15,7 @@ TeleSubmit v2 支持两种运行模式：**Polling（轮询）** 和 **Webhook**
 
 ---
 
-## 🔧 配置方法
+## 配置方法
 
 ### 1. 编辑配置文件
 
@@ -90,7 +90,7 @@ Environment="WEBHOOK_PORT=8080"
 
 ---
 
-## 🚀 快速开始
+## 快速开始
 
 ### 方式 1：配置文件模式（推荐本地/VPS）
 
@@ -190,7 +190,7 @@ docker-compose up -d
 查看日志，应该看到类似输出：
 ```
 📡 启动 Webhook 模式...
-✅ Webhook 模式已启动
+Webhook 模式已启动
    监听地址: 0.0.0.0:8080/webhook
    外部地址: https://your-domain.com/webhook
    Secret Token: 已设置
@@ -198,7 +198,7 @@ docker-compose up -d
 
 ---
 
-## 🔄 模式切换
+## 模式切换
 
 ### 从 Polling 切换到 Webhook
 
@@ -264,7 +264,7 @@ export RUN_MODE=POLLING
 
 ---
 
-## 🛡️ 安全性
+## 安全性
 
 ### Secret Token 验证
 
@@ -323,7 +323,7 @@ Status: 稳定运行
 
 ---
 
-## 🔍 故障排查
+## 故障排查
 
 ### 1. Webhook 设置失败
 
@@ -402,7 +402,7 @@ location /webhook {
 
 ---
 
-## 📈 性能优化
+## 性能优化
 
 ### Webhook 模式的优势
 
@@ -439,21 +439,21 @@ DB_CACHE_KB=1024
 
 ---
 
-## 💡 最佳实践
+## 最佳实践
 
 ### 1. 生产环境
 
-- ✅ 使用 **Webhook 模式**
-- ✅ 设置 **Secret Token**
-- ✅ 启用 HTTPS（Let's Encrypt 或 PaaS 自动）
-- ✅ 配置健康检查
-- ✅ 使用反向代理（Nginx/Caddy）
+- 使用 **Webhook 模式**
+- 设置 **Secret Token**
+- 启用 HTTPS（Let's Encrypt 或 PaaS 自动）
+- 配置健康检查
+- 使用反向代理（Nginx/Caddy）
 
 ### 2. 开发环境
 
-- ✅ 使用 **Polling 模式**
-- ✅ 本地测试更方便
-- ✅ 无需配置域名
+- 使用 **Polling 模式**
+- 本地测试更方便
+- 无需配置域名
 
 ### 3. 混合部署
 
@@ -463,7 +463,7 @@ DB_CACHE_KB=1024
 
 ---
 
-## 📚 相关文档
+## 相关文档
 
 - [主文档 - README.md](../README.md)
 - [脚本使用指南 - SCRIPTS_GUIDE.md](../SCRIPTS_GUIDE.md)
@@ -472,7 +472,7 @@ DB_CACHE_KB=1024
 
 ---
 
-## ❓ 常见问题
+## 常见问题
 
 ### Q: 我应该使用哪种模式？
 
@@ -498,7 +498,7 @@ DB_CACHE_KB=1024
 
 ---
 
-## 🔗 技术细节
+## 技术细节
 
 ### Webhook 请求流程
 

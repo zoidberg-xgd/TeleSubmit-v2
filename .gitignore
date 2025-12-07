@@ -108,8 +108,10 @@ PRIVACY_PROTECTION_SUMMARY.md
 
 # 临时文档和测试文档
 *_SUMMARY.md
-*_GUIDE.md
+# *_GUIDE.md  <-- Commented out to allow GUIDE files
 !SCRIPTS_GUIDE.md
+!ADMIN_GUIDE.md
+!DELETE_POST_GUIDE.md
 *_FIX.md
 *_QUICKSTART.md
 *_README.md

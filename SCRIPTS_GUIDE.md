@@ -10,12 +10,12 @@
 | `install.sh` | 一键安装向导 | 首次部署 |
 | `deploy.sh` | Docker 部署 | 首次部署 |
 | `start.sh` | 启动机器人 | 日常使用 |
-| `restart.sh` | 重启机器人 | 日常使用 ⭐ |
+| `restart.sh` | 重启机器人 | 日常使用 |
 | `update.sh` | 拉取更新 | 定期维护 |
 | `upgrade.sh` | 功能升级 | 版本升级 |
 | `uninstall.sh` | 卸载程序 | 移除服务 |
 
-> **v2.1+ 新特性**: 修改配置后使用 `restart.sh` 即可自动完成分词器切换和索引重建！
+> **v2.1+ 新特性**: 修改配置后使用 `restart.sh` 即可自动完成分词器切换和索引重建！ 🚀
 
 ## 首次部署
 
@@ -337,7 +337,7 @@ cp -r ~/uninstall_*/data .
 ./deploy.sh --rebuild  # 强制重建镜像
 ```
 
-### 场景 7：切换分词器（v2.1+）⭐
+### 场景 7：切换分词器（v2.1+）
 
 **从 simple 切换到 jieba（高质量中文分词）**:
 ```bash
